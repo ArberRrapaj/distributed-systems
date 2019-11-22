@@ -140,7 +140,6 @@ public class Node extends Thread {
 
 
         if(m.find()) {
-            System.out.println("Pattern matched!");
             String clusterList = m.group(1);
             System.out.println("Cluster List: " + clusterList);
 

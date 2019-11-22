@@ -50,14 +50,12 @@ public class TCPSocketCommunicator extends Thread implements Communicator {
 
 
     public String continuouslyRead() throws IOException {
-        System.out.println(socket.getLocalPort() + ": Let's read.");
         String inputLine;
         while ((inputLine = in.readLine()) != null) {
-            System.out.println(socket.getLocalPort() + " reading...");
             if (inputLine.contains(breakString)){
                 return inputLine;
             }
-            System.out.println(socket.getPort() + ": " + inputLine);
+            System.out.println(socket.getPort() + "read: " + inputLine);
             String answer = node.getAnswer(inputLine, this);
             if(answer != null) {
                 System.out.println(socket.getPort() + " answers: " + answer);
@@ -65,8 +63,6 @@ public class TCPSocketCommunicator extends Thread implements Communicator {
                 out.flush();
             }
         }
-
-        System.out.println(socket.getLocalPort() + ": finished reading.");
 
         return "";
     }

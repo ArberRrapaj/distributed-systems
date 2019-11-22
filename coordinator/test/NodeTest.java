@@ -37,16 +37,13 @@ class NodeTest {
         nodes.add(node2);
         node2.searchCluster();
         assertNotNull(node2.getCluster());
-        System.out.println("Test: " + node.getPort() + ": "  + node.getCluster() + " " + node2.getPort());
         assertTrue(node.getCluster().contains(node2.getPort()));
-        System.out.println("Test2: " + node2.getCluster());
         assertTrue(node2.getCluster().contains(node.getPort()));
 
         Node node3 = new Node(getRandomPort());
         nodes.add(node3);
         node3.searchCluster();
         assertNotNull(node3.getCluster());
-        System.out.println("Test3: " + node3.getCluster());
         assertTrue(node3.getCluster().contains(node.getPort()));
         assertTrue(node3.getCluster().contains(node2.getPort()));
     }
