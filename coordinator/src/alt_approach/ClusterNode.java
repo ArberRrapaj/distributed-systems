@@ -161,6 +161,12 @@ public class ClusterNode extends Thread {
         return timestamp;
     }
 
+    public void receivedMessageToWrite(String message) {
+        headNode.writeTextToFile(message);
+        String lastLine = headNode.readLastLineOfFile();
+        System.out.println(lastLine);
+    }
+
     public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
     }
@@ -169,4 +175,7 @@ public class ClusterNode extends Thread {
         return timestamp;
     }
 
+    public int getPort() {
+        return port;
+    }
 }

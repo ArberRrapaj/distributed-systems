@@ -371,16 +371,17 @@ public class Node extends Thread {
     }
 
     public void sendMessage(String message) {
-        // TODO: Ask coordinator for timestamp + add to message
-
         String timestamp;
         if(status == Status.COORDINATOR) {
             timestamp = new Timestamp(new Date().getTime()).toString();
             System.out.println("I am the coordinator, so I don't have to ask for a timestamp");
         } else {
             ClusterNode coordinatorNode = cluster.get(coordinator);
-            coordinatorNode.requestTimestamp();
+            timestamp = coordinatorNode.requestTimestamp();
         }
+
+        message = timestamp + "@" + port + ": " + message;
+        writeTextToFile(message);
 
         for (Map.Entry<Integer, ClusterNode> entry : cluster.entrySet()) {
             entry.getValue().write(message);
@@ -392,6 +393,59 @@ public class Node extends Thread {
         listening = false;
         for (int port : cluster.keySet()) {
             cluster.get(port).close();
+        }
+    }
+
+    public void writeTextToFile(String text) {
+        // Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+        String line = text + "\r\n";
+
+        FileWriter fw;
+        try {
+            fw = new FileWriter(port + ".txt", true); // the true will append the new data
+            fw.write(line);
+            // String last = line.substring(line.lastIndexOf('-') + 1).replace("\n", "").replace("\r", "");
+            // System.out.println("line written: " + text);
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String readLastLineOfFile() {
+        File file = new File(port + ".txt");
+        RandomAccessFile rafile = null;
+        try {
+            rafile = new RandomAccessFile(file, "r");
+            long fileLength = rafile.length() - 1;
+            StringBuilder sb = new StringBuilder();
+
+            for (long filePointer = fileLength; filePointer != -1; filePointer--) {
+                rafile.seek(filePointer);
+                int readByte = rafile.readByte();
+
+                if (readByte == 0xA) { // \n
+                    if (filePointer == fileLength)
+                        continue;
+                    break;
+                } else if (readByte == 0xD) { // \r
+                    if (filePointer == fileLength - 1)
+                        continue;
+                    break;
+                }
+                sb.append((char) readByte);
+            }
+            String lastLine = sb.reverse().toString();
+            return lastLine;
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (rafile != null)
+                try {
+                    rafile.close();
+                } catch (IOException e) {
+                }
         }
     }
 }

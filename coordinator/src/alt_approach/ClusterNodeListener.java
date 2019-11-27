@@ -1,9 +1,6 @@
 package alt_approach;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 import java.sql.Timestamp;
 import java.util.Date;
@@ -51,11 +48,14 @@ public class ClusterNodeListener extends Thread {
 
                     if (nextLine != null) {
                         System.out.println(nextLine);
+                        if (nextLine.equals(StandardMessages.ANSWER_TIME.toString())) continue;
                         if (nextLine.equals(StandardMessages.REQUEST_TIME.toString())) {
                             clusterNode.write(StandardMessages.ANSWER_TIME.toString());
                             clusterNode.write("The current time is: " + new Timestamp(new Date().getTime()));
                             // System.out.println(" -> The current time is: " + new Timestamp(new Date().getTime()));
                             clusterNode.handleHandshake("THANKS");
+                        } else {
+                            clusterNode.receivedMessageToWrite(nextLine);
                         }
 
 
