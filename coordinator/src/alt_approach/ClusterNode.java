@@ -194,11 +194,15 @@ public class ClusterNode extends Thread {
         String answer = handleHandshake("THANKS");
         if (answer == "THANKS") System.out.println("Got the hash");
         System.out.println("The Hash: " + hash);
-        if (hash.equals("null")) headNode.deleteMessagesFile();
-        if (hash.equals(headNode.getFilesHash())) System.out.println("File is up to date");
-        else {
-            // Okay krise, Datei ist nicht gleich
-            // TODO: ask coordinator for complete file
+        if (hash.equals("null")) {
+            System.out.println("Seems like the coordinator had no file, gonna delete mine too then");
+            headNode.deleteMessagesFile();
+        } else {
+            if (hash.equals(headNode.getFilesHash())) System.out.println("File is up to date");
+            else {
+                // Okay krise, Datei ist nicht gleich
+                // TODO: ask coordinator for complete file
+            }
         }
         listener.restartListening();
     }
