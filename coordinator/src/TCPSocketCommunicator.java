@@ -72,7 +72,7 @@ public class TCPSocketCommunicator extends Thread implements Communicator {
         try {
             continuouslyRead();
         } catch(IOException e) {
-            System.out.println("Client: " + socket.getLocalPort() + " failed to read.");
+            System.out.println("Node: " + socket.getLocalPort() + " failed to read.");
         }
         close();
     }

@@ -35,44 +35,44 @@ public class Node extends Thread {
 
         status = Status.SEARCHING;
 
-        for(int port=LOWER_PORT; port <= UPPER_PORT; port++) {
+        for (int port = LOWER_PORT; port <= UPPER_PORT; port++) {
             System.out.println("Port " + this.port + " checking: " + port);
-            if(port != this.port) {
-                TCPSocketCommunicator communicator;
-                try {
-                    communicator = establishCommunication(port);
-                } catch(ConnectException e) {
-                    continue;
-                }
+            if (port == this.port) continue; // Skip same port
+            TCPSocketCommunicator communicator;
+            try {
+                communicator = establishCommunication(port);
+            } catch (ConnectException e) {
 
-                communicator.write("Hello I am: " + this.port
-                        + "; are you a coordinator?");
-
-                String answer = waitForAnswer("STATUS", communicator);
-
-                if(!answer.isEmpty()) {
-                    System.out.println("Answer: " + answer);
-
-                    if (answer.contains(Status.COORDINATOR.toString())) {
-                        System.out.println("Found coordinator: " + port);
-                        joinCluster(answer, port, communicator);
-                        return;
-
-                    } else if (answer.equals("I am searching.")) {
-                        status = Status.WAITING;
-                        try {
-                            sleep(5000);
-                        } catch (InterruptedException e) {
-                            communicator.close();
-                            System.exit(1);
-                        }
-
-                        searchCluster();
-                        return;
-                    }
-                }
-
+                continue;
             }
+
+            communicator.write("Hello I am: " + this.port
+                    + "; are you a coordinator?");
+
+            String answer = waitForAnswer("STATUS", communicator);
+
+            if (!answer.isEmpty()) {
+                System.out.println("Answer: " + answer);
+
+                if (answer.contains(Status.COORDINATOR.toString())) {
+                    System.out.println("Found coordinator: " + port);
+                    joinCluster(answer, port, communicator);
+                    return;
+
+                } else if (answer.equals("I am searching.")) {
+                    status = Status.WAITING;
+                    try {
+                        sleep(5000);
+                    } catch (InterruptedException e) {
+                        communicator.close();
+                        System.exit(1);
+                    }
+
+                    searchCluster();
+                    return;
+                }
+            }
+
 
         }
 
@@ -139,24 +139,24 @@ public class Node extends Thread {
         Matcher m = p.matcher(answer);
 
 
-        if(m.find()) {
+        if (m.find()) {
             String clusterList = m.group(1);
             System.out.println("Cluster List: " + clusterList);
 
-            if(!clusterList.isEmpty()) {
+            if (!clusterList.isEmpty()) {
                 String[] members = clusterList.split(", ");
                 System.out.println("Size of " + members.length);
-                for(String memberPortString : members) {
+                for (String memberPortString : members) {
                     Integer memberPort = Integer.valueOf(memberPortString);
                     cluster.put(memberPort, null);
                 }
 
-                for(Integer memberPort : cluster.keySet()) {
+                for (Integer memberPort : cluster.keySet()) {
                     try {
                         TCPSocketCommunicator memberCommunicator = establishCommunication(port);
                         communicateJoin(memberCommunicator);
                         cluster.put(memberPort, memberCommunicator);
-                    } catch(ConnectException e) {
+                    } catch (ConnectException e) {
                         System.out.println("Failed to connect to: " + port);
                         continue;
                     }
@@ -171,13 +171,13 @@ public class Node extends Thread {
     }
 
     public void run() {
-       listen();
+        listen();
     }
 
     private void listen() {
         listening = true;
 
-        while(listening) {
+        while (listening) {
             Socket socket = server.connect();
             TCPSocketCommunicator communicator = new TCPSocketCommunicator(this, socket);
             communicator.setBreakString("exit");
@@ -193,11 +193,11 @@ public class Node extends Thread {
     public String getAnswer(String message, TCPSocketCommunicator communicator) {
         Pattern p = Pattern.compile("I am: (\\d+); are you a coordinator\\?");
         Matcher m = p.matcher(message);
-        if(m.find()) {
+        if (m.find()) {
 
-            if(status == Status.COORDINATOR) {
+            if (status == Status.COORDINATOR) {
                 return Status.COORDINATOR.toString() + " This is my gang: " + cluster.keySet().toString();
-            } else if(status == Status.SEARCHING) {
+            } else if (status == Status.SEARCHING) {
                 return Status.SEARCHING.toString();
             } else {
                 return Status.NO_COORDINATOR.toString();
@@ -207,14 +207,13 @@ public class Node extends Thread {
 
         Pattern joinPattern = Pattern.compile("I \\((\\d+)\\) want to JOIN");
         Matcher joinMatcher = joinPattern.matcher(message);
-        if(joinMatcher.find()) {
+        if (joinMatcher.find()) {
             int joiningPort = Integer.valueOf(joinMatcher.group(1));
             cluster.put(joiningPort, communicator);
             return "ACCEPT";
         }
 
         return null;
-
     }
 
     public Set<Integer> getCluster() {
@@ -229,7 +228,7 @@ public class Node extends Thread {
         System.out.println("Closing...");
         listening = false;
         server.close();
-        for(int port : cluster.keySet()) {
+        for (int port : cluster.keySet()) {
             cluster.get(port).close();
         }
     }
