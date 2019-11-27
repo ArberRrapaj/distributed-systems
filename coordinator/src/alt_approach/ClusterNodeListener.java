@@ -48,15 +48,20 @@ public class ClusterNodeListener extends Thread {
 
                     if (nextLine != null) {
                         System.out.println(nextLine);
+                        if (nextLine.equals(StandardMessages.SEND_FILE_HASH.toString())) {
+                            clusterNode.write(StandardMessages.ANSWER_TIME.toString());
+                            clusterNode.write("The file's hash is: " + clusterNode.headNode.getFilesHash());
+                            clusterNode.handleHandshake("THANKS");
+                            continue;
+                        }
                         if (nextLine.equals(StandardMessages.ANSWER_TIME.toString())) continue;
                         if (nextLine.equals(StandardMessages.REQUEST_TIME.toString())) {
                             clusterNode.write(StandardMessages.ANSWER_TIME.toString());
                             clusterNode.write("The current time is: " + new Timestamp(new Date().getTime()));
-                            // System.out.println(" -> The current time is: " + new Timestamp(new Date().getTime()));
                             clusterNode.handleHandshake("THANKS");
-                        } else {
-                            clusterNode.receivedMessageToWrite(nextLine);
+                            continue;
                         }
+                        clusterNode.receivedMessageToWrite(nextLine);
 
 
                     }

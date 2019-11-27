@@ -1,7 +1,12 @@
 package alt_approach;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.*;
 // import java.util.UUID;
@@ -232,6 +237,7 @@ public class Node extends Thread {
                 ClusterNode clusterNode = new ClusterNode(port, coordinator, this);
                 clusterNode.communicateJoin();
                 cluster.put(coordinator, clusterNode);
+                clusterNode.handleMessagesFile();
             } catch (ConnectException e) {
                 System.out.println("Failed to connect to coordinator: " + port);
             }
@@ -344,6 +350,13 @@ public class Node extends Thread {
             return "THANKS";
         }
 
+        Pattern fileHashPattern = Pattern.compile("The file's hash is: (.+)");
+        Matcher fileHashMatcher = fileHashPattern.matcher(message);
+        if (fileHashMatcher.find()) {
+            // System.out.println(fileHashMatcher.group(1));
+            clusterNode.setHash(fileHashMatcher.group(1));
+            return "THANKS";
+        }
 
         return null;
     }
@@ -448,4 +461,31 @@ public class Node extends Thread {
                 }
         }
     }
+
+    public String getFilesHash() {
+        byte[] b = new byte[0];
+        try {
+            b = Files.readAllBytes(Paths.get(port + ".txt"));
+            byte[] hash = MessageDigest.getInstance("MD5").digest(b);
+            return DatatypeConverter.printHexBinary(hash);
+        } catch (IOException | NoSuchAlgorithmException e) {
+            // e.printStackTrace();
+            System.out.println("There is no file, thus no hash");
+            return null;
+        }
+    }
+
+    public boolean deleteMessagesFile() {
+        File file = new File(port + ".txt");
+        try {
+            return Files.deleteIfExists(file.toPath());
+        } catch (IOException e) {
+            // e.printStackTrace();
+            System.out.println("Couldn't delete file, flop");
+            return false;
+        }
+    }
+
+
+
 }

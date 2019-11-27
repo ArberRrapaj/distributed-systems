@@ -10,7 +10,7 @@ public class ClusterNode extends Thread {
     private int port;
     private int connectionPort;
     private Socket socket;
-    private Node headNode;
+    protected Node headNode;
     private int id;
     protected BufferedReader in;
     protected PrintWriter out;
@@ -19,6 +19,7 @@ public class ClusterNode extends Thread {
 
     private final int TIMEOUT = 100;
     private String timestamp;
+    private String hash;
 
 
     public ClusterNode(int port, int portToConnectTo, Node headNode) throws ConnectException {
@@ -175,7 +176,30 @@ public class ClusterNode extends Thread {
         return timestamp;
     }
 
+    public void setHash(String hash) {
+        this.hash = hash;
+    }
+
+    public String getHash() {
+        return hash;
+    }
+
     public int getPort() {
         return port;
+    }
+
+    public void handleMessagesFile() {
+        listener.stopListening();
+        write(StandardMessages.SEND_FILE_HASH.toString());
+        String answer = handleHandshake("THANKS");
+        if (answer == "THANKS") System.out.println("Got the hash");
+        System.out.println("The Hash: " + hash);
+        if (hash.equals("null")) headNode.deleteMessagesFile();
+        if (hash.equals(headNode.getFilesHash())) System.out.println("File is up to date");
+        else {
+            // Okay krise, Datei ist nicht gleich
+            // TODO: ask coordinator for complete file
+        }
+        listener.restartListening();
     }
 }
