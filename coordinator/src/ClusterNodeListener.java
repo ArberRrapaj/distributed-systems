@@ -1,12 +1,7 @@
-package alt_approach;
-
 import java.io.*;
 import java.net.Socket;
 import java.sql.Timestamp;
 import java.util.Date;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 
 public class ClusterNodeListener extends Thread {

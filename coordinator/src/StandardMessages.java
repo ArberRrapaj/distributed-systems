@@ -1,5 +1,3 @@
-package alt_approach;
-
 public enum StandardMessages {
 
     REQUEST_TIME("Hey coordinator, can you please tell me the time?"),

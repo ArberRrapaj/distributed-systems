@@ -1,5 +1,3 @@
-package alt_approach;
-
 import java.io.*;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
@@ -196,7 +194,7 @@ public class ClusterNode extends Thread {
         System.out.println("The Hash: " + hash);
         if (hash.equals("null")) {
             System.out.println("Seems like the coordinator had no file, gonna delete mine too then");
-            headNode.deleteMessagesFile();
+            headNode.deleteMessagesFile(); //TODO: reelection
         } else {
             if (hash.equals(headNode.getFilesHash())) System.out.println("File is up to date");
             else {

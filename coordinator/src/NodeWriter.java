@@ -1,5 +1,3 @@
-package alt_approach;
-
 import java.util.Scanner;
 
 public class NodeWriter extends Thread {
