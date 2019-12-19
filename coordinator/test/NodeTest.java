@@ -1,5 +1,6 @@
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,21 +27,21 @@ class NodeTest {
     }
 
     @Test
-    void secondAndThirdNodeJoinCluster() {
-        Node node = new Node(getRandomPort());
+    void secondAndThirdNodeJoinCluster() throws IOException, InterruptedException {
+        Node node = new Node(IP, getRandomPort());
         nodes.add(node);
         node.searchCluster();
         assertNotNull(node.getCluster());
         assertTrue(node.getCluster().isEmpty());
 
-        Node node2 = new Node(getRandomPort());
+        Node node2 = new Node(IP, getRandomPort());
         nodes.add(node2);
         node2.searchCluster();
         assertNotNull(node2.getCluster());
         assertTrue(node.getCluster().contains(node2.getPort()));
         assertTrue(node2.getCluster().contains(node.getPort()));
 
-        Node node3 = new Node(getRandomPort());
+        Node node3 = new Node(IP, getRandomPort());
         nodes.add(node3);
         node3.searchCluster();
         assertNotNull(node3.getCluster());
