@@ -4,7 +4,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 
-public class ClusterNode extends Thread {
+public class TcpWriter extends Thread {
     private int port;
     private int connectionPort;
     private Socket socket;
@@ -12,7 +12,7 @@ public class ClusterNode extends Thread {
     private int id;
     protected BufferedReader in;
     protected PrintWriter out;
-    private ClusterNodeListener listener;
+    private TcpListener listener;
     private boolean listening = true;
 
     private final int TIMEOUT = 100;
@@ -20,7 +20,7 @@ public class ClusterNode extends Thread {
     private String hash;
 
 
-    public ClusterNode(int port, int portToConnectTo, Node headNode) throws ConnectException {
+    public TcpWriter(int port, int portToConnectTo, Node headNode) throws ConnectException {
         this.headNode = headNode;
         this.port = port;
         setId(portToConnectTo);
@@ -29,7 +29,7 @@ public class ClusterNode extends Thread {
         System.out.println("\nOh, seems like I wanna connect to: " + portToConnectTo);
     }
 
-    public ClusterNode(int port, Socket socket, Node headNode) {
+    public TcpWriter(int port, Socket socket, Node headNode) {
         this.port = port;
         this.socket = socket;
         this.headNode = headNode;
@@ -53,45 +53,6 @@ public class ClusterNode extends Thread {
     }
 
 
-    public void run() {
-        String answer = handleHandshake("exit");
-        if (!answer.isEmpty()) startTightRelationship();
-    }
-
-    public String handleHandshake(String breakString) {
-        String inputLine;
-        while (true) {
-            try {
-                // System.out.println("Trying to readLine in handleHandshake");
-                // TODO: add timeout here?
-                inputLine = in.readLine();
-                // System.out.println("read line in readLine in handleHandshake");
-                if (inputLine == null) break;
-                System.out.println(headNode.getPort() + " read: " + inputLine);
-                if (inputLine.contains(breakString)) {
-                    return inputLine;
-                }
-                String answer = headNode.getAnswer(inputLine, this);
-                // System.out.println("Answe: " + answer);
-                if (answer != null) {
-                    System.out.println(headNode.getPort() + " answers: " + answer);
-                    out.println(answer);
-                    out.flush();
-                    // System.out.println(answer);
-                    if (answer.equals("ACCEPT")) return "ACCEPT";
-                    if (answer.equals("THANKS")) return "THANKS";
-                } // What is else = bullshit request?
-            } catch (IOException e) {
-                // e.printStackTrace();
-                listening = false;
-                System.out.println("Node: " + socket.getLocalPort() + " failed to read.");
-            }
-
-        }
-        return "";
-    }
-
-
     public void setupInOutput() {
         try {
             out = new PrintWriter(socket.getOutputStream());
@@ -102,19 +63,6 @@ public class ClusterNode extends Thread {
         }
     }
 
-    public void communicateJoin() {
-        write("I (" + port + ") want to JOIN");
-        String answer = handleHandshake("ACCEPT");
-        if (!answer.isEmpty()) {
-            // Accepted, start listening deamon
-            startTightRelationship();
-        }
-    }
-
-    private void startTightRelationship() {
-        listener = new ClusterNodeListener(this, socket, in);
-        listener.start();
-    }
 
     public void write(String message) {
         out.println(message);
@@ -142,19 +90,11 @@ public class ClusterNode extends Thread {
         return id;
     }
 
-
-    public void listenerDied() {
-        listener.close();
-        listener = null;
-        System.out.println("Seems like my listener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore. See you in hell.");
-        headNode.clusterNodeDied(id);
-    }
-
     public String requestTimestamp() {
         listener.stopListening();
         write("Hey coordinator, can you please tell me the time?");
-        String answer = handleHandshake("THANKS");
-        if (answer == "THANKS") System.out.println("Got the timestamp");
+        // TODO: String answer = handleHandshake("THANKS");
+        // TODO: if (answer == "THANKS") System.out.println("Got the timestamp");
         System.out.println("The timestamp: " + timestamp);
         listener.restartListening();
         return timestamp;
@@ -189,8 +129,8 @@ public class ClusterNode extends Thread {
     public void handleMessagesFile() {
         listener.stopListening();
         write(StandardMessages.SEND_FILE_HASH.toString());
-        String answer = handleHandshake("THANKS");
-        if (answer == "THANKS") System.out.println("Got the hash");
+        // TODO: String answer = handleHandshake("THANKS");
+        // TODO: if (answer == "THANKS") System.out.println("Got the hash");
         System.out.println("The Hash: " + hash);
         if (hash.equals("null")) {
             System.out.println("Seems like the coordinator had no file, gonna delete mine too then");

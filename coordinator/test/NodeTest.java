@@ -38,15 +38,15 @@ class NodeTest {
         nodes.add(node2);
         node2.searchCluster();
         assertNotNull(node2.getCluster());
-        assertTrue(node.getCluster().contains(node2.getPort()));
-        assertTrue(node2.getCluster().contains(node.getPort()));
+        assertTrue(node.getCluster().values().contains(node2.getPort()));
+        assertTrue(node2.getCluster().values().contains(node.getPort()));
 
         Node node3 = new Node(IP, getRandomPort());
         nodes.add(node3);
         node3.searchCluster();
         assertNotNull(node3.getCluster());
-        assertTrue(node3.getCluster().contains(node.getPort()));
-        assertTrue(node3.getCluster().contains(node2.getPort()));
+        assertTrue(node3.getCluster().values().contains(node.getPort()));
+        assertTrue(node3.getCluster().values().contains(node2.getPort()));
     }
 
 

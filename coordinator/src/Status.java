@@ -1,5 +1,5 @@
 public enum Status {
-    COORDINATOR("Yes I am a coordinator!!1! "),
+    COORDINATOR("COORDINATOR ME"),
     SEARCHING("I am searching"),
     WAITING("I am waiting"),
     NO_COORDINATOR("No, I am no coordinator"),
