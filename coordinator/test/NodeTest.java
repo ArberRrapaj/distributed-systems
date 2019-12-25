@@ -35,14 +35,18 @@ class NodeTest {
         Node node2 = new Node(getRandomPort(), "Bob");
         nodes.add(node2);
         assertNotNull(node2.getClusterNames());
-        assertTrue(node.getClusterNames().values().contains(node2.getPort()));
-        assertTrue(node2.getClusterNames().values().contains(node.getPort()));
+        assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
+        assertTrue(node.getClusterNames().values().contains("Bob"));
+        assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
+        assertTrue(node2.getClusterNames().values().contains("Alice"));
 
         Node node3 = new Node(getRandomPort(), "Charlie");
         nodes.add(node3);
         assertNotNull(node3.getClusterNames());
-        assertTrue(node3.getClusterNames().values().contains(node.getPort()));
-        assertTrue(node3.getClusterNames().values().contains(node2.getPort()));
+        assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
+        //assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
+        assertTrue(node3.getClusterNames().values().contains("Alice"));
+        assertTrue(node3.getClusterNames().values().contains("Bob"));
     }
 
 

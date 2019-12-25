@@ -134,7 +134,7 @@ public class Node extends Thread {
         }
 
         try {
-            multicaster.send(status.toString());
+            multicaster.send(status.toString() + " " + name);
         } catch(IOException e) {
             // instance that requested no longer available. Ignore.
             e.printStackTrace();

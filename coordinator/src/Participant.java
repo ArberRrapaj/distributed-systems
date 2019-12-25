@@ -20,8 +20,10 @@ public class Participant extends Role {
     private void joinCluster(Message answer) {
         clusterNames = new HashMap<>();
         coordinator = answer.getSender();
-        System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinator);
+        String coordinatorName = answer.getText().split(" ")[2];
+        addToCluster(coordinator, coordinatorName);
 
+        System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinatorName + " " + coordinator);
         establishCoordConnection(coordinator);
 
         // TODO: handleMessagesFile()
@@ -31,15 +33,8 @@ public class Participant extends Role {
     private void establishCoordConnection(int coordinator) {
         try {
             coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-            // Setup Listener for Coordinator Comm.
-            Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
-            if(newSocket.getPort() == coordinator) {
-                coordTcpListener = new TcpListener(this, node, newSocket);
-                coordTcpListener.start();
-            } else {
-                throw new ConnectException("Failed to establish listener connection with coordinator.");
-            }
-
+            coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
+            coordTcpListener.start();
         } catch(IOException e) {
             // Cannot connect to Coordinator -> Re-Election
             // TODO: Re-Election
@@ -64,7 +59,11 @@ public class Participant extends Role {
 
             if (messageSplit.length > 2) {
                 for (int i = 2; i < messageSplit.length; i += 2) {
-                    clusterNames.put(Integer.valueOf(messageSplit[i + 1]), messageSplit[i + 1]);
+                    int port = Integer.valueOf(messageSplit[i + 1]);
+                    String name = messageSplit[i];
+                    if(port != node.getPort()) {
+                        addToCluster(port, name);
+                    }
                 }
             }
 

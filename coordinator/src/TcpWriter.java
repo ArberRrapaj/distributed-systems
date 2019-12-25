@@ -82,6 +82,10 @@ public class TcpWriter extends Thread {
         }
     }
 
+    public Socket getSocket() {
+        return socket;
+    }
+
     /*
 
     public void setId(int id) {
