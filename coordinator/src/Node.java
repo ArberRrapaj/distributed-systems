@@ -12,18 +12,19 @@ public class Node extends Thread {
 
     // CONFIGURATION
     private static String IP = "localhost";
-    private static String MULTICAST_IP = "239.192.0.1"; // in local scope 239.*
+    private static String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*
+    private static int MULTICAST_PORT = 4321;
     private static final int LOWER_PORT = 5050;
     private static final int UPPER_PORT = 5100;
-    private final int MC_TIMEOUT = 1000;
+    private static final int MC_TIMEOUT = 1000;
 
     // Communication
     private Role role;
     // Ports:
     private int coordinator;
     private int port;
-    public Map<Integer, String> getCluster() {
-        return role.getCluster();
+    public Map<Integer, String> getClusterNames() {
+        return role.getClusterNames();
     }
     // Connections:
     private ServerSocket newConnectionsSocket;
@@ -33,8 +34,6 @@ public class Node extends Thread {
     private boolean running = true;
     private String name = null;
     private Status status;
-    private boolean listening = false;
-
 
 
     public static void main(String[] args) {
@@ -46,8 +45,7 @@ public class Node extends Thread {
 
             // Create new Node with that port
             try {
-                node = new Node(port);
-                node.searchCluster();
+                node = new Node(port, "Alice");
             } catch(ConnectException e) {
                 e.printStackTrace();
                 continue;
@@ -57,13 +55,16 @@ public class Node extends Thread {
         }
     }
 
-    public Node(int port) throws ConnectException {
+    public Node(int port, String name) throws ConnectException {
         System.setProperty("java.net.preferIPv4Stack", "true");
 
-        System.out.println("Started Node");
+        System.out.println("\nStarted Node with name: " + name);
+        this.name = name;
         this.port = port;
 
-        multicaster = new Multicaster(this, MULTICAST_IP, port, MC_TIMEOUT);
+        multicaster = new Multicaster(this, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
+
+        searchCluster();
         multicaster.start();
     }
 
@@ -73,7 +74,7 @@ public class Node extends Thread {
         status = Status.SEARCHING; // Set the node's status to SEARCHING
 
         try {
-            multicaster.send(StandardMessages.CLUSTER_SEARCH.toString());
+            multicaster.send(StandardMessages.CLUSTER_SEARCH.toString() + " " + name);
         } catch (IOException e) {
             System.err.println("Failed to send CLUSTER_SEARCH");
             e.printStackTrace();
@@ -112,39 +113,37 @@ public class Node extends Thread {
         }
 
 
-        // no coordinator found...
-        role = new Coordinator(this);
+        // no coordinator found... -> create
+        Coordinator coordinator = new Coordinator(this);
+        role = coordinator;
+        // start listening
+        Thread coordinatorThread = new Thread(coordinator);
+        coordinatorThread.start();
     }
 
 
 
-    public void shareStatus(Message message) {
+    public void answerSearchRequest(Message message) {
+
+        Status status = null;
+        if(role != null) {
+            status = role.getStatus();
+            role.addToCluster(message.getSender(), message.getText().split(" ")[2]); // COORDINATOR SEARCH <NAME>
+        } else {
+            status = this.status;
+        }
+
         try {
-            unicastMessageTo(status.toString(), message.getSender());
+            multicaster.send(status.toString());
         } catch(IOException e) {
             // instance that requested no longer available. Ignore.
+            e.printStackTrace();
         }
     }
 
 
     public int getPort() {
         return port;
-    }
-
-
-    public void unicastMessageTo(String message, Integer to) throws IOException {
-        if (message == null || message.isEmpty()) { return; }
-        Socket socket = new Socket();
-        SocketAddress address = new InetSocketAddress(MULTICAST_IP, port);
-        socket.connect(address);
-        PrintWriter out = new PrintWriter(socket.getOutputStream());
-
-        out.println(message);
-        out.flush();
-        System.out.println("Unicasted: " + message);
-
-        out.close();
-        socket.close();
     }
 
 

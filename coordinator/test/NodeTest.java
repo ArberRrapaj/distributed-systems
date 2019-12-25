@@ -27,25 +27,22 @@ class NodeTest {
 
     @Test
     void secondAndThirdNodeJoinCluster() throws IOException {
-        Node node = new Node(getRandomPort());
+        Node node = new Node(getRandomPort(), "Alice");
         nodes.add(node);
-        node.searchCluster();
-        assertNotNull(node.getCluster());
-        assertTrue(node.getCluster().isEmpty());
+        assertNotNull(node.getClusterNames());
+        assertTrue(node.getClusterNames().isEmpty());
 
-        Node node2 = new Node(getRandomPort());
+        Node node2 = new Node(getRandomPort(), "Bob");
         nodes.add(node2);
-        node2.searchCluster();
-        assertNotNull(node2.getCluster());
-        assertTrue(node.getCluster().values().contains(node2.getPort()));
-        assertTrue(node2.getCluster().values().contains(node.getPort()));
+        assertNotNull(node2.getClusterNames());
+        assertTrue(node.getClusterNames().values().contains(node2.getPort()));
+        assertTrue(node2.getClusterNames().values().contains(node.getPort()));
 
-        Node node3 = new Node(getRandomPort());
+        Node node3 = new Node(getRandomPort(), "Charlie");
         nodes.add(node3);
-        node3.searchCluster();
-        assertNotNull(node3.getCluster());
-        assertTrue(node3.getCluster().values().contains(node.getPort()));
-        assertTrue(node3.getCluster().values().contains(node2.getPort()));
+        assertNotNull(node3.getClusterNames());
+        assertTrue(node3.getClusterNames().values().contains(node.getPort()));
+        assertTrue(node3.getClusterNames().values().contains(node2.getPort()));
     }
 
 

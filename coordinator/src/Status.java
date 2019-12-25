@@ -11,7 +11,7 @@ public enum Status {
     }
 
     public String toString() {
-        return "STATUS: " + messageRegex;
+        return messageRegex;
     }
 
 

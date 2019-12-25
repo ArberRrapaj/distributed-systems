@@ -8,13 +8,13 @@ public class NodeWriter extends Thread {
 
     public NodeWriter(Role role) {
         this.role = role;
-        System.out.println("Role Writer active for role: " + role.getPort());
+        System.out.println("Node Writer active for node: " + role.getPort());
         inputScanner = new Scanner(System.in); // Create a Scanner object
     }
 
     public void getInput() {
         while (running) {
-            System.out.print("\n What do you want to send the other roles?: ");
+            System.out.print("\n What do you want to send the other nodes?: ");
             String message = inputScanner.nextLine(); // Read user input
             role.sendMessage(message);
         }

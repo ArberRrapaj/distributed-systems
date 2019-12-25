@@ -7,7 +7,6 @@ public class Participant extends Role {
 
     private final Status status = Status.PARTICIPANT;
 
-    private Node node;
     private int coordinator;
 
     private TcpWriter coordTcpWriter;
@@ -19,10 +18,8 @@ public class Participant extends Role {
     }
 
     private void joinCluster(Message answer) {
-        cluster = new HashMap<>();
-
-        String[] messageSplit = answer.getText().split(" ");
-        coordinator = Integer.valueOf(messageSplit[2]);
+        clusterNames = new HashMap<>();
+        coordinator = answer.getSender();
         System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinator);
 
         establishCoordConnection(coordinator);
@@ -67,7 +64,7 @@ public class Participant extends Role {
 
             if (messageSplit.length > 2) {
                 for (int i = 2; i < messageSplit.length; i += 2) {
-                    cluster.put(Integer.valueOf(messageSplit[i + 1]), messageSplit[i + 1]);
+                    clusterNames.put(Integer.valueOf(messageSplit[i + 1]), messageSplit[i + 1]);
                 }
             }
 
@@ -76,7 +73,7 @@ public class Participant extends Role {
 
     }
 
-    public void listenerDied() {
+    public void listenerDied(int port) {
         coordTcpListener.close();
         coordTcpListener = null;
         System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
@@ -93,4 +90,7 @@ public class Participant extends Role {
         coordTcpListener.close();
     }
 
+    public Status getStatus() {
+        return status;
+    }
 }

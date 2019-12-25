@@ -13,15 +13,15 @@ public abstract class Role {
         return node.getPort();
     }
 
-    protected Map<Integer, String> cluster;
-    public Map<Integer, String> getCluster() {
-        return cluster;
+    protected Map<Integer, String> clusterNames;
+    public Map<Integer, String> getClusterNames() {
+        return clusterNames;
     }
 
     public Role(Node node) {
         this.node = node;
 
-        cluster = new HashMap<>();
+        clusterNames = new HashMap<>();
 
         nodeWriter = new NodeWriter(this);
 
@@ -29,7 +29,6 @@ public abstract class Role {
         // Setup the socket server
         try {
             newConnectionsSocket = new ServerSocket(node.getPort());
-            System.out.println("\nI'll be listening for new connections on port: " + node.getPort());
         } catch (IOException e) {
             System.out.println("There was an error setting up the newConnectionsSocket");
             e.printStackTrace();
@@ -42,8 +41,10 @@ public abstract class Role {
 
     public abstract void actionOnMessage(Message message);
 
+    public abstract void listenerDied(int port);
+
     public int printCurrentlyConnected() {
-        int connectedUsers = cluster.keySet().size();
+        int connectedUsers = clusterNames.keySet().size();
         System.out.println("Cluster status:");
         switch (connectedUsers) {
             case 0:
@@ -66,5 +67,11 @@ public abstract class Role {
         } catch (IOException e) {
             // failed to close. ignore.
         }
+    }
+
+    public abstract Status getStatus();
+
+    public void addToCluster(Integer port, String name) {
+        clusterNames.put(port, name);
     }
 }

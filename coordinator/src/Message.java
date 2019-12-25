@@ -19,6 +19,11 @@ public class Message {
         this.text = text;
     }
 
+    @Override
+    public String toString() {
+        return text;
+    }
+
     public boolean startsWith(@NotNull String prefix) {
         return text.startsWith(prefix);
     }

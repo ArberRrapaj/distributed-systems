@@ -43,12 +43,13 @@ public class TcpListener extends Thread {
                     String nextLine = in.readLine();
 
                     if (nextLine != null) {
-                        System.out.println(nextLine);
-                        role.actionOnMessage(nextLine);
+                        System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
+                        Message message = new Message(socket.getPort(), nextLine);
+                        role.actionOnMessage(message);
                     }
                 } catch (IOException ioe) {
                     System.out.println(ioe);
-                    node.listenerDied();
+                    role.listenerDied(socket.getPort());
                 }
             }
         }

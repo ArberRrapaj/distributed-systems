@@ -6,17 +6,18 @@ public class Multicaster extends Thread {
     private Node node;
 
     private boolean running;
-    private int port;
+    private int mcPort;
     private InetAddress mcGroup;
     private MulticastSocket mcSocket;
 
-    public Multicaster(Node node, String ip, int port, int timeout) throws ConnectException {
-        this.port = port;
 
+    public Multicaster(Node node, String ip, int port, int timeout) throws ConnectException {
         // join Multicast group
+        this.node = node;
+        mcPort = port;
         try {
             mcGroup = InetAddress.getByName(ip);
-            mcSocket = new MulticastSocket(3819); // dynmamically allocate a free port anywhere
+            mcSocket = new MulticastSocket(mcPort);
             mcSocket.joinGroup(mcGroup);
             mcSocket.setSoTimeout(timeout);
         } catch(UnknownHostException e) {
@@ -34,11 +35,18 @@ public class Multicaster extends Thread {
     }
 
     private void listen() {
-       while(true) {
+        try{
+            mcSocket.setSoTimeout(0);
+        } catch (SocketException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        while(true) {
            try {
                Message received = receive();
                if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
-                   node.shareStatus(received);
+                   node.answerSearchRequest(received);
                } else {
                    System.err.println("Received unexpected Multicast message: " + received);
                }
@@ -46,24 +54,45 @@ public class Multicaster extends Thread {
                // nothing received, repeat
            } catch(IOException e) {
                e.printStackTrace();
-               break;
+               System.exit(1);
            }
+
        }
     }
 
     public void send(String message) throws IOException {
-        DatagramPacket packet = new DatagramPacket(message.getBytes(),
-                message.length(), mcGroup, port);
+        System.out.println(node.getPort() + " sending multicast message: " + message);
+        String mcMessage = node.getPort() + "|" + message;
+        byte[] buf = mcMessage.getBytes();
+
+        DatagramPacket packet = new DatagramPacket(buf, buf.length, mcGroup, mcPort);
         mcSocket.send(packet);
     }
 
     public Message receive() throws IOException {
-        byte[] buf = new byte[1000];
+        byte[] buf = new byte[256];
         DatagramPacket recv = new DatagramPacket(buf, buf.length);
         mcSocket.receive(recv);
 
-        String received = new String(recv.getData(), 0, recv.getLength());
+        String mcReceived = new String(recv.getData(), recv.getOffset(), recv.getLength());
+        String[] receivedSplit = mcReceived.split("\\|");
 
-        return new Message(recv.getPort(), received);
+        int sender = Integer.parseInt(receivedSplit[0]);
+        if(sender == node.getPort()) {
+            //TODO: handle differently
+            return new Message(0, ""); // ignore messages sent by yourself
+        }
+        System.out.println(node.getPort() + " [Multicast UDP message received] >> " + receivedSplit[1]);
+        return new Message(sender, receivedSplit[1]);
+    }
+
+    public void close() {
+        try {
+            mcSocket.leaveGroup(mcGroup);
+            mcSocket.close();
+        } catch (IOException e) {
+            // failed to leave. ignore.
+        }
     }
 }
+

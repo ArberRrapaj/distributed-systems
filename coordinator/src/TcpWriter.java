@@ -23,10 +23,10 @@ public class TcpWriter extends Thread {
     public TcpWriter(int port, int portToConnectTo, Role headRole, Node headNode) throws ConnectException {
         this.headNode = headNode;
         this.port = port;
-        setId(portToConnectTo);
+        id = portToConnectTo;
         connect(portToConnectTo);
         setupInOutput();
-        System.out.println("\nOh, seems like I wanna connect to: " + portToConnectTo);
+        System.out.println("\nOh, seems like I - " + headNode.getPort() + " wanna connect to: " + portToConnectTo);
     }
 
     public TcpWriter(int port, Socket socket, Node headNode) {
@@ -81,6 +81,8 @@ public class TcpWriter extends Thread {
             // System.exit(1);
         }
     }
+
+    /*
 
     public void setId(int id) {
         this.id = id;
@@ -144,4 +146,5 @@ public class TcpWriter extends Thread {
         }
         listener.restartListening();
     }
+    */
 }

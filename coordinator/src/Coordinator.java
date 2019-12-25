@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Coordinator extends Role implements Runnable {
-    private Node node;
     private final Status status = Status.COORDINATOR;
 
     private Map<Integer, TcpWriter> clusterWriters;
@@ -15,6 +14,8 @@ public class Coordinator extends Role implements Runnable {
 
     public Coordinator(Node node){
         super(node);
+
+        createCluster();
     }
 
     private void createCluster() {
@@ -25,9 +26,6 @@ public class Coordinator extends Role implements Runnable {
 
         nodeWriter.start();
 
-        // start listening
-        Thread t1 = new Thread(this);
-        t1.start();
     }
 
     public void run() {
@@ -41,10 +39,12 @@ public class Coordinator extends Role implements Runnable {
         while (listening) {
             // Wait for incoming connects: continuously accept new TCP connections for new cluster participants
             try {
+                System.out.println("I'll be listening for new connections on port: " + node.getPort());
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
+                System.out.println("New Connection: " + newSocket);
                 TcpListener newTcpListener = new TcpListener(this, node, newSocket);
                 clusterListeners.put(newSocket.getPort(), newTcpListener);
-                TcpWriter newTcpWriter = new TcpWriter(newConnectionsSocket.getLocalPort(), newSocket, node);
+                TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
                 clusterWriters.put(newSocket.getPort(), newTcpWriter);
 
                 welcomeNewNodeToCluster();
@@ -59,25 +59,34 @@ public class Coordinator extends Role implements Runnable {
     }
 
     private void welcomeNewNodeToCluster() {
+        shareUpdatedClusterInfo();
+    }
+
+    private String getCurrentClusterInfo() {
+        // TODO: use upon newly established or broken Socket Connnection -> Share among all
+        /* Message is of format:
+           CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
+        */
+        StringBuilder message = new StringBuilder("CLUSTER " + getCurrentIndex());
+        for (Integer port : clusterNames.keySet()) {
+            message.append(" " + clusterNames.get(port) + " " + port);
+        }
+
+        return message.toString();
+    }
+
+    private void shareUpdatedClusterInfo() {
+        String message = getCurrentClusterInfo();
+
+        for(TcpWriter writer : clusterWriters.values()) {
+            writer.write(message.toString());
+        }
 
     }
 
-    private void shareCurrentClusterInfo() {
-        // TODO: use upon newly established or broken Socket Connnection -> Share among all
-        /* Message is of format:
-         CLUSTER <NAME> ...
-            ... <PARTICIPANT-1-NAME> <PARTICIPANT-1-PORT> ...
-            ... <PARTICIPANT-2-NAME> <PARTICIPANT-2-PORT> ...
-        */
-        StringBuilder answer = new StringBuilder("CLUSTER " + node.getName());
-        for (Integer port : cluster.keySet()) {
-            answer.append(" " + cluster.get(port) + " " + port);
-        }
-
-        for(TcpWriter writer : clusterWriters.values()) {
-            writer.write(answer.toString());
-        }
-
+    private int getCurrentIndex() {
+        System.err.println("getCurrentIndex() not implemented.");
+        return 0;
     }
 
     public void sendMessage(String message) {
@@ -125,26 +134,36 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void killClusterNode(int port) {
-        TcpWriter writerToRemove = clusterWriters.get(port);
+        clusterNames.remove(port);
+
+        TcpWriter writerToRemove = clusterWriters.getOrDefault(port, null);
         if (writerToRemove != null) {
             writerToRemove.close();
-            cluster.remove(port);
             System.out.println("Node " + port + " yote him/herself out of the party!");
             int nodesLeft = printCurrentlyConnected();
             // TODO: last node leaves the gang
-            if (nodesLeft == 0) {
-                // make myself coordinator
-                System.out.println("https://youtu.be/0bGjlvukgHU");
-                // maybe searchCluster again?
-                // but check possible Thread start conflicts
-            }
         } // else = not found - can this even happen?
+
+        TcpListener listenerToRemove = clusterListeners.getOrDefault(port, null);
+        if(listenerToRemove != null) {
+            listenerToRemove.close();
+        }
     }
+
+    public void listenerDied(int port) {
+        killClusterNode(port);
+        shareUpdatedClusterInfo();
+    }
+
 
     public void close() {
         super.close();
         System.out.println("Closing...");
         listening = false;
 
+    }
+
+    public Status getStatus() {
+        return status;
     }
 }
