@@ -10,19 +10,21 @@ public class Multicaster extends Thread {
     private InetAddress mcGroup;
     private MulticastSocket mcSocket;
 
-    public Multicaster(Node node, String ip, int port) throws ConnectException {
+    public Multicaster(Node node, String ip, int port, int timeout) throws ConnectException {
         this.port = port;
 
         // join Multicast group
         try {
             mcGroup = InetAddress.getByName(ip);
-            mcSocket = new MulticastSocket(0); // dynmamically allocate a free port anywhere
+            mcSocket = new MulticastSocket(3819); // dynmamically allocate a free port anywhere
             mcSocket.joinGroup(mcGroup);
+            mcSocket.setSoTimeout(timeout);
         } catch(UnknownHostException e) {
             e.printStackTrace();
             System.exit(1);
         } catch(IOException e) {
-            throw new ConnectException("Socket in use or failed to join Multicast group.");
+            e.printStackTrace();
+            throw new ConnectException("Socket in use or failed to join Multicast group: " );
         }
     }
 
@@ -35,7 +37,13 @@ public class Multicaster extends Thread {
        while(true) {
            try {
                Message received = receive();
-               node.actionOnMessage(received);
+               if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
+                   node.shareStatus(received);
+               } else {
+                   System.err.println("Received unexpected Multicast message: " + received);
+               }
+           } catch(SocketTimeoutException e) {
+               // nothing received, repeat
            } catch(IOException e) {
                e.printStackTrace();
                break;

@@ -2,21 +2,21 @@ import java.util.Scanner;
 
 public class NodeWriter extends Thread {
 
-    private Node node;
+    private Role role;
     private Scanner inputScanner;
     private boolean running;
 
-    public NodeWriter(Node node) {
-        this.node = node;
-        System.out.println("Node Writer active for node: " + node.getPort());
+    public NodeWriter(Role role) {
+        this.role = role;
+        System.out.println("Role Writer active for role: " + role.getPort());
         inputScanner = new Scanner(System.in); // Create a Scanner object
     }
 
     public void getInput() {
         while (running) {
-            System.out.print("\n What do you want to send the other nodes?: ");
+            System.out.print("\n What do you want to send the other roles?: ");
             String message = inputScanner.nextLine(); // Read user input
-            node.sendMessage(message);
+            role.sendMessage(message);
         }
         inputScanner.close();
     }

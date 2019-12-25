@@ -8,12 +8,14 @@ public class TcpListener extends Thread {
 
 
     protected BufferedReader in;
+    private Role role;
     private Node node;
     private Socket socket;
     private volatile boolean running = true;
     private volatile boolean listening = true;
 
-    public TcpListener(Node node, Socket socket) throws IOException {
+    public TcpListener(Role role, Node node, Socket socket) throws IOException {
+        this.role = role;
         this.node = node;
         this.socket = socket;
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -38,12 +40,11 @@ public class TcpListener extends Thread {
 
             if (listening) {
                 try {
-                    // TODO: sort message into file
                     String nextLine = in.readLine();
 
                     if (nextLine != null) {
                         System.out.println(nextLine);
-                        node.actionOnCoordinatorMessage(nextLine);
+                        role.actionOnMessage(nextLine);
                     }
                 } catch (IOException ioe) {
                     System.out.println(ioe);

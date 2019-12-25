@@ -20,7 +20,7 @@ public class TcpWriter extends Thread {
     private String hash;
 
 
-    public TcpWriter(int port, int portToConnectTo, Node headNode) throws ConnectException {
+    public TcpWriter(int port, int portToConnectTo, Role headRole, Node headNode) throws ConnectException {
         this.headNode = headNode;
         this.port = port;
         setId(portToConnectTo);

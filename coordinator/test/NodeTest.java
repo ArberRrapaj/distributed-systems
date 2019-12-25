@@ -11,7 +11,6 @@ class NodeTest {
 
     private static Set<Integer> availablePorts;
 
-    private String IP = "localhost";
     private static final int LOWER_PORT = 5050;
     private static final int UPPER_PORT = 5100;
 
@@ -27,21 +26,21 @@ class NodeTest {
     }
 
     @Test
-    void secondAndThirdNodeJoinCluster() throws IOException, InterruptedException {
-        Node node = new Node(IP, getRandomPort());
+    void secondAndThirdNodeJoinCluster() throws IOException {
+        Node node = new Node(getRandomPort());
         nodes.add(node);
         node.searchCluster();
         assertNotNull(node.getCluster());
         assertTrue(node.getCluster().isEmpty());
 
-        Node node2 = new Node(IP, getRandomPort());
+        Node node2 = new Node(getRandomPort());
         nodes.add(node2);
         node2.searchCluster();
         assertNotNull(node2.getCluster());
         assertTrue(node.getCluster().values().contains(node2.getPort()));
         assertTrue(node2.getCluster().values().contains(node.getPort()));
 
-        Node node3 = new Node(IP, getRandomPort());
+        Node node3 = new Node(getRandomPort());
         nodes.add(node3);
         node3.searchCluster();
         assertNotNull(node3.getCluster());
