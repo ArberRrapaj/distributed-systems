@@ -63,6 +63,7 @@ public class Participant extends Role {
                     String name = messageSplit[i];
                     if(port != node.getPort()) {
                         addToCluster(port, name);
+                        System.out.println("Added " + name + " to cluster");
                     }
                 }
             }

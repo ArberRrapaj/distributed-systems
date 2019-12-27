@@ -14,7 +14,7 @@ public class NodeWriter extends Thread {
 
     public void getInput() {
         while (running) {
-            System.out.print("\n What do you want to send the other nodes?: ");
+            System.out.print("\n What do you want to send to the other nodes?: ");
             String message = inputScanner.nextLine(); // Read user input
             role.sendMessage(message);
         }

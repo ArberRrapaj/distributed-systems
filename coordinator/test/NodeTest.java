@@ -25,6 +25,7 @@ class NodeTest {
         }
     }
 
+    /*
     @Test
     void secondAndThirdNodeJoinCluster() throws IOException {
         Node node = new Node(getRandomPort(), "Alice");
@@ -46,7 +47,26 @@ class NodeTest {
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
         //assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
+        try {
+            // Wait for node to add the other ones
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         assertTrue(node3.getClusterNames().values().contains("Bob"));
+    }
+    */
+
+
+    @Test
+    void sendMessageAsCoordinator() throws IOException {
+        Node node = new Node(getRandomPort(), "Alice");
+        nodes.add(node);
+
+        Node node2 = new Node(getRandomPort(), "Bob");
+        nodes.add(node2);
+
+        node.role.sendMessage("Hi");
     }
 
 

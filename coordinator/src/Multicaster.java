@@ -45,8 +45,17 @@ public class Multicaster extends Thread {
         while(true) {
            try {
                Message received = receive();
-               if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
+               if (received == null); // System.out.println("I've received my own message from multicast");
+               else if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
                    node.answerSearchRequest(received);
+               } else if(received.getIndex() != null) {
+                    System.out.println("That's a new message, I wanna write this down");
+                    if ( (node.writeIndex + 1) == received.getIndex() ){
+                        node.messageQueue.receivedMessage(received.getIndex());
+                        node.messageQueue.checkForAvailableMessagesToWrite();
+                    } else if ((node.writeIndex + 1) < received.getIndex()){
+                        node.messageQueue.receivedHigherMessage(received);
+                   }
                } else {
                    System.err.println("Received unexpected Multicast message: " + received);
                }
@@ -56,7 +65,6 @@ public class Multicaster extends Thread {
                e.printStackTrace();
                System.exit(1);
            }
-
        }
     }
 
@@ -78,12 +86,19 @@ public class Multicaster extends Thread {
         String[] receivedSplit = mcReceived.split("\\|");
 
         int sender = Integer.parseInt(receivedSplit[0]);
-        if(sender == node.getPort()) {
-            //TODO: handle differently
-            return new Message(0, ""); // ignore messages sent by yourself
+        if (sender == node.getPort()) {
+            // TODO: handle differently
+            return null; // ignore messages sent by yourself
         }
-        System.out.println(node.getPort() + " [Multicast UDP message received] >> " + receivedSplit[1]);
-        return new Message(sender, receivedSplit[1]);
+        String content = receivedSplit[1];
+        System.out.println(node.getPort() + " [Multicast UDP message received] >> " + content);
+        if (content.startsWith(StandardMessages.NEW_MESSAGE.toString())) {
+            content = content.substring(StandardMessages.NEW_MESSAGE.toString().length() + 1);
+            String[] messageSplit = content.split("\\$", 4);
+            // System.out.println(messageSplit[0]);
+            int index = Integer.parseInt(messageSplit[0]);
+            return new Message(sender, index, messageSplit[1], messageSplit[2], messageSplit[3]);
+        } else return new Message(sender, content);
     }
 
     public void close() {

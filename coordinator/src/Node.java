@@ -12,14 +12,16 @@ public class Node extends Thread {
 
     // CONFIGURATION
     private static String IP = "localhost";
-    private static String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*
+    private static String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*, else 230.*
     private static int MULTICAST_PORT = 4321;
     private static final int LOWER_PORT = 5050;
     private static final int UPPER_PORT = 5100;
     private static final int MC_TIMEOUT = 1000;
 
     // Communication
-    private Role role;
+    Role role; // Public for testing purpose
+    int writeIndex = 0;
+    MessageQueue messageQueue = new MessageQueue(this);
     // Ports:
     private int coordinator;
     private int port;
@@ -29,7 +31,7 @@ public class Node extends Thread {
     // Connections:
     private ServerSocket newConnectionsSocket;
     private NodeWriter writer;
-    private Multicaster multicaster;
+    public Multicaster multicaster;
     // Status:
     private boolean running = true;
     private String name = null;
@@ -90,6 +92,7 @@ public class Node extends Thread {
             for (int trials = 0; trials < 20; trials++) {
                 Message received = multicaster.receive();
 
+                if (received == null) continue; // own message
                 if (received.getText().startsWith(Status.COORDINATOR.toString())) {
                     role = new Participant(this, received);
                     return;
@@ -246,5 +249,21 @@ public class Node extends Thread {
     }
 
     */
+    public void writeToFile(Message message) {
+        String line = message.getLine() + "\r\n";
+
+        FileWriter fw;
+        try {
+            fw = new FileWriter(port + ".txt", true); // the true will append the new data
+            fw.write(line);
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public int getNewIndex() {
+        return writeIndex++;
+    }
 
 }

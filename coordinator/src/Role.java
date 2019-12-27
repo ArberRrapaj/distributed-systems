@@ -39,6 +39,10 @@ public abstract class Role {
 
     public abstract void sendMessage(String message);
 
+    public void requestMessage(Integer messageIndex) {
+        sendMessage(StandardMessages.REQUEST_MESSAGE.toString() + " " + messageIndex);
+    }
+
     public abstract void actionOnMessage(Message message);
 
     public abstract void listenerDied(int port);

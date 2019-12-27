@@ -1,6 +1,8 @@
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -90,7 +92,14 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void sendMessage(String message) {
-        //TODO: Implement send Message – reserve index for yourself and send without request
+        // TODO: Implement send Message – reserve index for yourself and send without request
+        // No need to ask for timestamp, write ahead and send to other nodes
+        try {
+            node.multicaster.send(StandardMessages.NEW_MESSAGE.toString() + " " + node.getNewIndex() + "$" + node.getName() + "$" + new Timestamp(new Date().getTime()).toString() + "$" + message);
+        } catch (IOException e) {
+            e.printStackTrace();
+            // try again
+        }
     }
 
     public void actionOnMessage(Message message) {
