@@ -3,24 +3,28 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.util.HashMap;
 
-public class Participant extends Role {
+public class Participant extends Role implements Runnable {
 
     private final Status status = Status.PARTICIPANT;
 
-    private int coordinator;
+    private Integer coordinator;
+    private String coordinatorName;
 
     private TcpWriter coordTcpWriter;
     private TcpListener coordTcpListener;
 
-    public Participant(Node node, Message coordAnswer) {
+    public Participant(Node node, int coordinator, String coordinatorName) {
         super(node);
-        joinCluster(coordAnswer);
+        this.coordinator = coordinator;
+        this.coordinatorName = coordinatorName;
     }
 
-    private void joinCluster(Message answer) {
+    public void run() {
+        joinCluster(coordinator, coordinatorName);
+    }
+
+    private void joinCluster(int coordinator, String coordinatorName) {
         clusterNames = new HashMap<>();
-        coordinator = answer.getSender();
-        String coordinatorName = answer.getText().split(" ")[2];
         addToCluster(coordinator, coordinatorName);
 
         System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinatorName + " " + coordinator);
@@ -37,8 +41,8 @@ public class Participant extends Role {
             coordTcpListener.start();
         } catch(IOException e) {
             // Cannot connect to Coordinator -> Re-Election
-            // TODO: Re-Election
             System.out.println("Could not establish a connection with the coordinator. Let's trigger a re-election.");
+            initiateReElection();
         }
     }
 
@@ -67,29 +71,48 @@ public class Participant extends Role {
                 }
             }
 
+            node.setLatestClusterSize(clusterNames.size());
         }
 
 
     }
 
     public void listenerDied(int port) {
-        coordTcpListener.close();
-        coordTcpListener = null;
+        close();
         System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
-        // TODO: initiateElection();
+        initiateReElection();
     }
-
 
 
     public void close() {
         super.close();
 
-        // Close the TCP connection to the coordinator
-        coordTcpWriter.close();
-        coordTcpListener.close();
+        if(coordTcpListener != null) {
+            coordTcpListener.close();
+            coordTcpListener = null;
+        }
+
+        if(coordTcpWriter != null) {
+            coordTcpWriter.close();
+            coordTcpWriter.close();
+        }
     }
 
     public Status getStatus() {
         return status;
+    }
+
+    @Override
+    public void handleDeathOf(Integer port) {
+        if(coordinator.equals(port)) {
+            coordinator = null;
+            initiateReElection();
+        } else {
+            clusterNames.remove(port);
+        }
+    }
+
+    private void initiateReElection() {
+        node.reElection();
     }
 }

@@ -4,13 +4,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 public abstract class Role {
-    protected ServerSocket newConnectionsSocket;
 
     protected Node node;
     protected NodeWriter nodeWriter;
 
     public int getPort() {
         return node.getPort();
+    }
+
+    public String getName()  {
+        return node.getName();
     }
 
     protected Map<Integer, String> clusterNames;
@@ -24,17 +27,8 @@ public abstract class Role {
         clusterNames = new HashMap<>();
 
         nodeWriter = new NodeWriter(this);
+        nodeWriter.start();
 
-
-        // Setup the socket server
-        try {
-            newConnectionsSocket = new ServerSocket(node.getPort());
-        } catch (IOException e) {
-            System.out.println("There was an error setting up the newConnectionsSocket");
-            e.printStackTrace();
-            close();
-            System.exit(1);
-        }
     }
 
     public abstract void sendMessage(String message);
@@ -42,6 +36,11 @@ public abstract class Role {
     public abstract void actionOnMessage(Message message);
 
     public abstract void listenerDied(int port);
+
+    protected int getWriteIndex() {
+        return node.getWriteIndex();
+    }
+;
 
     public int printCurrentlyConnected() {
         int connectedUsers = clusterNames.keySet().size();
@@ -62,10 +61,8 @@ public abstract class Role {
 
 
     protected void close() {
-        try {
-            newConnectionsSocket.close();
-        } catch (IOException e) {
-            // failed to close. ignore.
+        if(nodeWriter != null) {
+            nodeWriter.close();
         }
     }
 
@@ -74,4 +71,6 @@ public abstract class Role {
     public void addToCluster(Integer port, String name) {
         clusterNames.put(port, name);
     }
+
+    public abstract void handleDeathOf(Integer port);
 }

@@ -5,13 +5,14 @@ public class Multicaster extends Thread {
 
     private Node node;
 
-    private boolean running;
+    private volatile boolean listening;
     private int mcPort;
     private InetAddress mcGroup;
     private MulticastSocket mcSocket;
 
 
     public Multicaster(Node node, String ip, int port, int timeout) throws ConnectException {
+        setName("Multicaster-"+node.getName());
         // join Multicast group
         this.node = node;
         mcPort = port;
@@ -30,11 +31,12 @@ public class Multicaster extends Thread {
     }
 
     public void run() {
-        running = true;
         listen();
     }
 
     private void listen() {
+        listening = true;
+
         try{
             mcSocket.setSoTimeout(0);
         } catch (SocketException e) {
@@ -42,19 +44,34 @@ public class Multicaster extends Thread {
             System.exit(1);
         }
 
-        while(true) {
-           try {
+        while(listening) {
+            if(node.getStatus() == Status.DEAD) {
+                close();
+                break;
+            }
+            try {
                Message received = receive();
-               if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
-                   node.answerSearchRequest(received);
-               } else {
-                   System.err.println("Received unexpected Multicast message: " + received);
+               if(!received.getText().isEmpty()) {
+                   if (received.startsWith(Status.REQUEST.toString())) {
+                       node.answerSearchRequest(received);
+                   } else if (received.startsWith(Status.DEAD.toString())) {
+                       node.handleDeathOf(received.getSender());
+                   } else if (received.startsWith(Status.ELECTION.toString())) {
+                       if (!node.getStatus().isInElection()) {
+                           node.reElection();
+                       }
+                       node.documentCandidate(received);
+                   } else if (received.startsWith(Status.ELECTED.toString())) {
+                       node.documentElected(received);
+                   } else {
+                       // ignore.
+                       // System.err.println("Received unexpected Multicast message: " + received);
+                   }
                }
            } catch(SocketTimeoutException e) {
                // nothing received, repeat
            } catch(IOException e) {
-               e.printStackTrace();
-               System.exit(1);
+               node.suicide();
            }
 
        }
@@ -87,8 +104,11 @@ public class Multicaster extends Thread {
     }
 
     public void close() {
+        listening = false;
         try {
             mcSocket.leaveGroup(mcGroup);
+            mcSocket.close();
+        } catch (SocketException e) {
             mcSocket.close();
         } catch (IOException e) {
             // failed to leave. ignore.

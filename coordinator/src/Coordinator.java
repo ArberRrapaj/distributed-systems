@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
@@ -7,13 +8,23 @@ import java.util.Map;
 public class Coordinator extends Role implements Runnable {
     private final Status status = Status.COORDINATOR;
 
+    private ServerSocket newConnectionsSocket;
     private Map<Integer, TcpWriter> clusterWriters;
     private Map<Integer, TcpListener> clusterListeners;
 
-    private boolean listening;
+    private volatile boolean listening;
 
     public Coordinator(Node node){
         super(node);
+
+        // Setup the socket server
+        try {
+            newConnectionsSocket = new ServerSocket(node.getPort());
+        } catch (IOException e) {
+            System.err.println("There was an error setting up the newConnectionsSocket");
+            e.printStackTrace();
+            node.suicide();
+        }
 
         createCluster();
     }
@@ -24,7 +35,6 @@ public class Coordinator extends Role implements Runnable {
         clusterWriters = new HashMap<>();
         clusterListeners = new HashMap<>();
 
-        nodeWriter.start();
 
     }
 
@@ -44,15 +54,14 @@ public class Coordinator extends Role implements Runnable {
                 System.out.println("New Connection: " + newSocket);
                 TcpListener newTcpListener = new TcpListener(this, node, newSocket);
                 clusterListeners.put(newSocket.getPort(), newTcpListener);
+                newTcpListener.start();
                 TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
                 clusterWriters.put(newSocket.getPort(), newTcpWriter);
 
                 welcomeNewNodeToCluster();
 
             } catch (IOException e) {
-                e.printStackTrace();
-                System.out.println("Failed to accept connection");
-                System.exit(1);
+                node.suicide();
             }
 
         }
@@ -67,7 +76,7 @@ public class Coordinator extends Role implements Runnable {
         /* Message is of format:
            CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
         */
-        StringBuilder message = new StringBuilder("CLUSTER " + getCurrentIndex());
+        StringBuilder message = new StringBuilder("CLUSTER " + getWriteIndex());
         for (Integer port : clusterNames.keySet()) {
             message.append(" " + clusterNames.get(port) + " " + port);
         }
@@ -84,10 +93,6 @@ public class Coordinator extends Role implements Runnable {
 
     }
 
-    private int getCurrentIndex() {
-        System.err.println("getCurrentIndex() not implemented.");
-        return 0;
-    }
 
     public void sendMessage(String message) {
         //TODO: Implement send Message – reserve index for yourself and send without request
@@ -155,12 +160,30 @@ public class Coordinator extends Role implements Runnable {
         shareUpdatedClusterInfo();
     }
 
+    public void handleDeathOf(Integer port) {
+        clusterNames.remove(port);
+        clusterWriters.get(port).close();
+        clusterListeners.get(port).close();
+        clusterListeners.remove(port);
+        clusterWriters.remove(port);
+        shareUpdatedClusterInfo();
+    }
 
     public void close() {
-        super.close();
-        System.out.println("Closing...");
-        listening = false;
-
+        System.out.println("Closing coordinator...");
+        if(listening) {
+            listening = false;
+            try {
+                if (newConnectionsSocket != null) {
+                    newConnectionsSocket.close();
+                }
+            } catch (IOException e) {
+                // ignore.
+            }
+            clusterListeners.values().forEach(x -> x.close());
+            clusterWriters.values().forEach(x -> x.close());
+            super.close();
+        }
     }
 
     public Status getStatus() {
