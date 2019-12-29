@@ -35,6 +35,7 @@ public class Participant extends Role {
             coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
             coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
             coordTcpListener.start();
+            nodeWriter.start();
         } catch(IOException e) {
             // Cannot connect to Coordinator -> Re-Election
             // TODO: Re-Election
@@ -43,7 +44,9 @@ public class Participant extends Role {
     }
 
     public void sendMessage(String message) {
-        //TODO: Implement send Message – request index + timestamp and send
+        // TODO: Implement send Message – request index + timestamp and send
+        // Request index and timestamp from coordinator
+        coordTcpWriter.write(StandardMessages.WANNA_SEND_MESSAGE + " " + node.name + "$" + message);
     }
 
     public void actionOnMessage(Message message) {
@@ -67,7 +70,17 @@ public class Participant extends Role {
                     }
                 }
             }
-
+        } else if (message.startsWith(StandardMessages.WANNA_SEND_RESPONSE.toString())) {
+            message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
+            try {
+                node.multicaster.send(message.asNewMessage());
+                // TODO: Do it like this or use existing listen() in multicaster?
+                node.messageQueue.handleNewMessage(message);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else if (message.startsWith(StandardMessages.CLOSE.toString())) {
+            node.close();
         }
 
 
@@ -88,6 +101,7 @@ public class Participant extends Role {
         // Close the TCP connection to the coordinator
         coordTcpWriter.close();
         coordTcpListener.close();
+        System.out.println(node.name + ": Participant closed");
     }
 
     public Status getStatus() {

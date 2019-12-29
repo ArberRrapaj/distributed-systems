@@ -1,3 +1,4 @@
+import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.net.*;
 import java.nio.Buffer;
@@ -7,6 +8,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.stream.Stream;
+
 
 public class Node extends Thread {
 
@@ -20,7 +23,8 @@ public class Node extends Thread {
 
     // Communication
     Role role; // Public for testing purpose
-    int writeIndex = 0;
+    int writeIndex = -1;
+    int writeAheadIndex = -1;
     MessageQueue messageQueue = new MessageQueue(this);
     // Ports:
     private int coordinator;
@@ -30,11 +34,11 @@ public class Node extends Thread {
     }
     // Connections:
     private ServerSocket newConnectionsSocket;
-    private NodeWriter writer;
+    // private NodeWriter writer;
     public Multicaster multicaster;
     // Status:
     private boolean running = true;
-    private String name = null;
+    public String name = null; // Public for testing purpose
     private Status status;
 
 
@@ -47,7 +51,7 @@ public class Node extends Thread {
 
             // Create new Node with that port
             try {
-                node = new Node(port, "Alice");
+                node = new Node(port, "Bertram");
             } catch(ConnectException e) {
                 e.printStackTrace();
                 continue;
@@ -63,7 +67,8 @@ public class Node extends Thread {
         System.out.println("\nStarted Node with name: " + name);
         this.name = name;
         this.port = port;
-
+        initializeWriteIndex();
+        writeAheadIndex = writeIndex;
         multicaster = new Multicaster(this, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
 
         searchCluster();
@@ -89,7 +94,7 @@ public class Node extends Thread {
         }
 
         try {
-            for (int trials = 0; trials < 20; trials++) {
+            for (int trials = 0; trials < 10; trials++) {
                 Message received = multicaster.receive();
 
                 if (received == null) continue; // own message
@@ -171,24 +176,44 @@ public class Node extends Thread {
         }
     }
 
-    public void writeTextToFile(String text) {
-        // Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-        String line = text + "\r\n";
-
-        FileWriter fw;
+    public boolean deleteMessagesFile() {
+        File file = new File(port + ".txt");
         try {
-            fw = new FileWriter(port + ".txt", true); // the true will append the new data
+            return Files.deleteIfExists(file.toPath());
+        } catch (IOException e) {
+            // e.printStackTrace();
+            System.out.println("Couldn't delete file, flop");
+            return false;
+        }
+    }
+
+    */
+    public void writeToFile(Message message) {
+        String line = message.getLine() + "\r\n";
+
+        File file = new File (name + ".txt");
+        FileWriter fw = null;
+
+        try {
+            if (!file.exists()) file.createNewFile();
+
+            fw = new FileWriter(file.getAbsoluteFile(), true); // append the new data to end
             fw.write(line);
-            // String last = line.substring(line.lastIndexOf('-') + 1).replace("\n", "").replace("\r", "");
-            // System.out.println("line written: " + text);
-            fw.close();
+            System.out.println("Written to file: " + new Timestamp(new Date().getTime()).toString());
         } catch (IOException e) {
             e.printStackTrace();
+            System.out.println("Error with writing to file");
+        } finally {
+            try {
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     public String readLastLineOfFile() {
-        File file = new File(port + ".txt");
+        File file = new File(name + ".txt");
         RandomAccessFile rafile = null;
         try {
             rafile = new RandomAccessFile(file, "r");
@@ -213,21 +238,52 @@ public class Node extends Thread {
             String lastLine = sb.reverse().toString();
             return lastLine;
         } catch (java.io.IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
+            // System.out.println("Can't access file");
             return null;
         } finally {
             if (rafile != null)
                 try {
                     rafile.close();
-                } catch (IOException e) {
-                }
+                } catch (IOException e) {}
         }
     }
 
-    public String getFilesHash() {
+    public String lookForIndexInFile(int index) {
+        File file = new File(name + ".txt");
+
+        try(BufferedReader br = new BufferedReader(new FileReader(file))) {
+            for(String line; (line = br.readLine()) != null; ) {
+                int lineIndex = Integer.parseInt(line.split(" ", 2)[0]);
+                if (index == lineIndex) {
+                    Message messageToReturn = new Message(getPort(), line);
+                    return messageToReturn.fileLineToRequested();
+                }
+                // messageQueue.putIntoMessages(lineIndex, line);
+            }
+            return null;
+        } catch (FileNotFoundException e) {
+            // e.printStackTrace();
+            return null;
+        } catch (IOException e) {
+            // e.printStackTrace();
+            return null;
+        }
+    }
+
+    public int initializeWriteIndex() {
+        String lastLine = readLastLineOfFile();
+        // System.out.println("The last line: " + lastLine);
+        if (lastLine == null || lastLine.trim().equals("")) writeIndex = -1;
+        else writeIndex = Integer.parseInt(lastLine.split(" ", 2)[0]);
+        return getCurrentWriteIndex();
+    }
+
+
+    public String getFileHash() {
         byte[] b = new byte[0];
         try {
-            b = Files.readAllBytes(Paths.get(port + ".txt"));
+            b = Files.readAllBytes(Paths.get(name + ".txt"));
             byte[] hash = MessageDigest.getInstance("MD5").digest(b);
             return DatatypeConverter.printHexBinary(hash);
         } catch (IOException | NoSuchAlgorithmException e) {
@@ -237,33 +293,30 @@ public class Node extends Thread {
         }
     }
 
-    public boolean deleteMessagesFile() {
-        File file = new File(port + ".txt");
-        try {
-            return Files.deleteIfExists(file.toPath());
-        } catch (IOException e) {
-            // e.printStackTrace();
-            System.out.println("Couldn't delete file, flop");
-            return false;
-        }
+    public int getNewWriteIndex() {
+        return ++writeIndex;
     }
 
-    */
-    public void writeToFile(Message message) {
-        String line = message.getLine() + "\r\n";
-
-        FileWriter fw;
-        try {
-            fw = new FileWriter(port + ".txt", true); // the true will append the new data
-            fw.write(line);
-            fw.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public int getNextWriteIndex() {
+        return writeIndex + 1;
     }
 
-    public int getNewIndex() {
-        return writeIndex++;
+    public int getCurrentWriteIndex() {
+        return writeIndex;
     }
 
+    public int getNewWriteAheadIndex() {
+        return ++writeAheadIndex;
+    }
+
+    public int getCurrentWriteAheadIndex() {
+        return writeAheadIndex;
+    }
+
+    public void close() {
+        System.out.println("Closing node");
+        multicaster.close();
+        role.close();
+        System.out.println(name + ": Node closed");
+    }
 }

@@ -42,28 +42,34 @@ public class Multicaster extends Thread {
             System.exit(1);
         }
 
-        while(true) {
+        while(running) {
            try {
                Message received = receive();
                if (received == null); // System.out.println("I've received my own message from multicast");
                else if (received.startsWith(StandardMessages.CLUSTER_SEARCH.toString())) {
                    node.answerSearchRequest(received);
                } else if(received.getIndex() != null) {
-                    System.out.println("That's a new message, I wanna write this down");
-                    if ( (node.writeIndex + 1) == received.getIndex() ){
-                        node.messageQueue.receivedMessage(received.getIndex());
-                        node.messageQueue.checkForAvailableMessagesToWrite();
-                    } else if ((node.writeIndex + 1) < received.getIndex()){
-                        node.messageQueue.receivedHigherMessage(received);
-                   }
+                    node.messageQueue.handleNewMessage(received);
+               } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE.toString())) {
+                   System.out.println(node.name + ": Received a message request: " + received.toString());
+                    // Get message with that index
+                   int index = Integer.parseInt(received.toString().substring(StandardMessages.REQUEST_MESSAGE.length() + 1));
+                   String requestedMessage = node.messageQueue.getMessage(index);
+                   System.out.println(node.name + ": I would send this to you: " + requestedMessage);
+                   send(requestedMessage);
+               } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE_ANSWER.toString())) {
+                   node.messageQueue.receivedRequestAnswer(received.sanitizeMessage(StandardMessages.REQUEST_MESSAGE_ANSWER));
                } else {
                    System.err.println("Received unexpected Multicast message: " + received);
                }
            } catch(SocketTimeoutException e) {
                // nothing received, repeat
            } catch(IOException e) {
-               e.printStackTrace();
-               System.exit(1);
+               System.out.println(node.name + ": Socket closed");
+               running = false;
+               // e.printStackTrace();
+
+               // System.exit(1);
            }
        }
     }
@@ -97,17 +103,22 @@ public class Multicaster extends Thread {
             String[] messageSplit = content.split("\\$", 4);
             // System.out.println(messageSplit[0]);
             int index = Integer.parseInt(messageSplit[0]);
+            if (messageSplit[3].startsWith(StandardMessages.CLOSE.toString())) {
+                node.close();
+            }
             return new Message(sender, index, messageSplit[1], messageSplit[2], messageSplit[3]);
         } else return new Message(sender, content);
     }
 
     public void close() {
         try {
+            running = false;
             mcSocket.leaveGroup(mcGroup);
             mcSocket.close();
         } catch (IOException e) {
             // failed to leave. ignore.
         }
+        System.out.println(node.name + ": Multicaster closed");
     }
 }
 

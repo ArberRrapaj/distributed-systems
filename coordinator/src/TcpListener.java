@@ -23,8 +23,9 @@ public class TcpListener extends Thread {
     }
 
     public void close() {
+        listening = false;
         running = false;
-        System.out.println("Seems like my true love, port " + socket.getPort() + " has just died. That means, me, the TcpListener will die now too, see you in hell.");
+        // System.out.println("Seems like my true love, port " + socket.getPort() + " has just died. That means, me, the TcpListener will die now too, see you in hell.");
 
         try {
             if (in != null) in.close();
@@ -32,6 +33,8 @@ public class TcpListener extends Thread {
             // e.printStackTrace();
             System.out.println("Couldn't close input-stream ¯\\_(ツ)_/¯");
         }
+        System.out.println(node.name + ": TcpListener closed");
+
     }
 
     public void run() {

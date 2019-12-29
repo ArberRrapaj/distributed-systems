@@ -67,10 +67,12 @@ public abstract class Role {
 
     protected void close() {
         try {
+            nodeWriter.close();
             newConnectionsSocket.close();
         } catch (IOException e) {
             // failed to close. ignore.
         }
+        System.out.println(node.name + ": Role closed");
     }
 
     public abstract Status getStatus();
