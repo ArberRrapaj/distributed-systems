@@ -53,12 +53,8 @@ class NodeTest {
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
         //assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
-        try {
-            // Wait for node to add the other ones
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
+        chillout(3000);
         assertTrue(node3.getClusterNames().values().contains("Bob"));
     }
 
@@ -88,12 +84,7 @@ class NodeTest {
         // Go2: 21:28:16.86
         // Last 'written to file': 21:28:16.859
 
-        try {
-            // Wait for node to add the other ones
-            Thread.sleep(10000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        chillout(500);
         assertEquals(node1.getFileHash(), node2.getFileHash());
         node1.close();
         node2.close();
@@ -125,12 +116,7 @@ class NodeTest {
         Node node2 = new Node(getRandomPort(), "Bertram");
 
         node2.close();
-        try {
-            // Wait for node to add the other ones
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        chillout(1000);
         node2 = null;
         node2.role.sendMessage("Hi");
     }
