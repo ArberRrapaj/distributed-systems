@@ -7,6 +7,7 @@ public abstract class Role {
 
     protected Node node;
     protected NodeWriter nodeWriter;
+    protected Thread nodeWriterThread;
 
     public int getPort() {
         return node.getPort();
@@ -27,7 +28,8 @@ public abstract class Role {
         clusterNames = new HashMap<>();
 
         nodeWriter = new NodeWriter(this);
-        nodeWriter.start();
+        nodeWriterThread = new Thread(nodeWriter, "NodeWriter-"+node.getName());
+        nodeWriterThread.start();
 
     }
 
@@ -61,15 +63,26 @@ public abstract class Role {
 
 
     protected void close() {
+        if(nodeWriterThread != null) {
+            nodeWriterThread.interrupt();
+            nodeWriterThread = null;
+        }
         if(nodeWriter != null) {
             nodeWriter.close();
+            nodeWriter = null;
         }
     }
 
     public abstract Status getStatus();
 
     public void addToCluster(Integer port, String name) {
-        clusterNames.put(port, name);
+        String existentVal = clusterNames.getOrDefault(port, null);
+        if(existentVal == null) {
+            clusterNames.put(port, name);
+        } else if(!existentVal.equals(name)) {
+            System.err.println("Overriding name of port " + port);
+            clusterNames.put(port, name);
+        }
     }
 
     public abstract void handleDeathOf(Integer port);

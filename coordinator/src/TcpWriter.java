@@ -8,7 +8,8 @@ public class TcpWriter extends Thread {
     private int port;
     private int connectionPort;
     private Socket socket;
-    protected Node headNode;
+    protected Node node;
+    protected Role role;
     private int id;
     protected BufferedReader in;
     protected PrintWriter out;
@@ -20,25 +21,26 @@ public class TcpWriter extends Thread {
     private String hash;
 
 
-    public TcpWriter(int port, int portToConnectTo, Role headRole, Node headNode) throws ConnectException {
-        this.headNode = headNode;
+    public TcpWriter(int port, int portToConnectTo, Role role, Node node) throws ConnectException {
+        this.node = node;
+        this.role = role;
         this.port = port;
         id = portToConnectTo;
         connect(portToConnectTo);
         setupInOutput();
-        System.out.println("\nOh, seems like I - " + headNode.getPort() + " wanna connect to: " + portToConnectTo);
+        System.out.println("\nOh, seems like I - " + node.getPort() + " wanna connect to: " + portToConnectTo);
     }
 
-    public TcpWriter(int port, Socket socket, Node headNode) {
+    public TcpWriter(int port, Socket socket, Node node) {
         this.port = port;
         this.socket = socket;
-        this.headNode = headNode;
+        this.node = node;
         this.id = socket.getPort();
         System.out.println("\nOh, there is a new connection: " + socket);
         setupInOutput();
     }
 
-    public Socket connect(int port) throws ConnectException {
+    private void connect(int port) throws ConnectException {
         socket = new Socket();
         SocketAddress address = new InetSocketAddress(port);
         try {
@@ -49,11 +51,10 @@ public class TcpWriter extends Thread {
         }
         System.out.println("TCPClient connected socket: " + socket);
         connectionPort = socket.getLocalPort();
-        return socket;
     }
 
 
-    public void setupInOutput() {
+    private void setupInOutput() {
         try {
             out = new PrintWriter(socket.getOutputStream());
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -73,7 +74,7 @@ public class TcpWriter extends Thread {
     public void close() {
         try {
             if (listener != null) listener.close();
-            if (in != null) in.close();
+            // if (in != null) in.close(); // TODO: blocks
             if (out != null) out.close();
             if (socket != null) socket.close();
         } catch (IOException e) {
@@ -107,8 +108,8 @@ public class TcpWriter extends Thread {
     }
 
     public void receivedMessageToWrite(String message) {
-        headNode.writeTextToFile(message);
-        String lastLine = headNode.readLastLineOfFile();
+        node.writeTextToFile(message);
+        String lastLine = node.readLastLineOfFile();
         System.out.println(lastLine);
     }
 
@@ -140,9 +141,9 @@ public class TcpWriter extends Thread {
         System.out.println("The Hash: " + hash);
         if (hash.equals("null")) {
             System.out.println("Seems like the coordinator had no file, gonna delete mine too then");
-            headNode.deleteMessagesFile(); //TODO: reelection
+            node.deleteMessagesFile(); //TODO: reelection
         } else {
-            if (hash.equals(headNode.getFilesHash())) System.out.println("File is up to date");
+            if (hash.equals(node.getFilesHash())) System.out.println("File is up to date");
             else {
                 // Okay krise, Datei ist nicht gleich
                 // TODO: ask coordinator for complete file

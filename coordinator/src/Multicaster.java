@@ -57,9 +57,7 @@ public class Multicaster extends Thread {
                    } else if (received.startsWith(Status.DEAD.toString())) {
                        node.handleDeathOf(received.getSender());
                    } else if (received.startsWith(Status.ELECTION.toString())) {
-                       if (!node.getStatus().isInElection()) {
-                           node.reElection();
-                       }
+                       new Thread(() -> node.reElection(), "reElection-mc").start();
                        node.documentCandidate(received);
                    } else if (received.startsWith(Status.ELECTED.toString())) {
                        node.documentElected(received);

@@ -5,28 +5,40 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.lang.Thread.sleep;
+
 public class Coordinator extends Role implements Runnable {
     private final Status status = Status.COORDINATOR;
 
     private ServerSocket newConnectionsSocket;
     private Map<Integer, TcpWriter> clusterWriters;
     private Map<Integer, TcpListener> clusterListeners;
+    private Map<Integer, Thread> listenerThreads;
 
     private volatile boolean listening;
 
-    public Coordinator(Node node){
+    public Coordinator(Node node) throws ConnectException {
         super(node);
 
-        // Setup the socket server
         try {
-            newConnectionsSocket = new ServerSocket(node.getPort());
+            setupSocketServer();
         } catch (IOException e) {
-            System.err.println("There was an error setting up the newConnectionsSocket");
-            e.printStackTrace();
-            node.suicide();
+            try {
+                sleep(2000);
+                setupSocketServer();
+            } catch (InterruptedException | IOException e1) {
+                System.err.println("There was an error setting up the newConnectionsSocket");
+                e.printStackTrace();
+                node.suicide();
+                throw new ConnectException(e.getMessage());
+            }
         }
 
         createCluster();
+    }
+
+    private void setupSocketServer() throws IOException {
+        newConnectionsSocket = new ServerSocket(node.getPort());
     }
 
     private void createCluster() {
@@ -34,7 +46,7 @@ public class Coordinator extends Role implements Runnable {
 
         clusterWriters = new HashMap<>();
         clusterListeners = new HashMap<>();
-
+        listenerThreads = new HashMap<>();
 
     }
 
@@ -53,10 +65,12 @@ public class Coordinator extends Role implements Runnable {
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
                 System.out.println("New Connection: " + newSocket);
                 TcpListener newTcpListener = new TcpListener(this, node, newSocket);
-                clusterListeners.put(newSocket.getPort(), newTcpListener);
-                newTcpListener.start();
+                int port = newSocket.getPort();
+                clusterListeners.put(port, newTcpListener);
+                listenerThreads.put(port, new Thread(newTcpListener, "TcpListener-"+node.getName()+"-"+port));
+                listenerThreads.get(port).start();
                 TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
-                clusterWriters.put(newSocket.getPort(), newTcpWriter);
+                clusterWriters.put(port, newTcpWriter);
 
                 welcomeNewNodeToCluster();
 
@@ -163,6 +177,7 @@ public class Coordinator extends Role implements Runnable {
     public void handleDeathOf(Integer port) {
         clusterNames.remove(port);
         clusterWriters.get(port).close();
+        listenerThreads.get(port).interrupt();
         clusterListeners.get(port).close();
         clusterListeners.remove(port);
         clusterWriters.remove(port);
@@ -178,8 +193,9 @@ public class Coordinator extends Role implements Runnable {
                     newConnectionsSocket.close();
                 }
             } catch (IOException e) {
-                // ignore.
+                e.printStackTrace();
             }
+            listenerThreads.values().forEach(x -> x.interrupt());
             clusterListeners.values().forEach(x -> x.close());
             clusterWriters.values().forEach(x -> x.close());
             super.close();

@@ -12,18 +12,22 @@ public class Participant extends Role implements Runnable {
 
     private TcpWriter coordTcpWriter;
     private TcpListener coordTcpListener;
+    private Thread listenerThread;
 
-    public Participant(Node node, int coordinator, String coordinatorName) {
+    public Participant(Node node, int coordinator, String coordinatorName) throws IOException {
         super(node);
         this.coordinator = coordinator;
         this.coordinatorName = coordinatorName;
-    }
 
-    public void run() {
         joinCluster(coordinator, coordinatorName);
     }
 
-    private void joinCluster(int coordinator, String coordinatorName) {
+    public void run() {
+        listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
+        listenerThread.start();
+    }
+
+    private void joinCluster(int coordinator, String coordinatorName) throws IOException {
         clusterNames = new HashMap<>();
         addToCluster(coordinator, coordinatorName);
 
@@ -34,16 +38,9 @@ public class Participant extends Role implements Runnable {
 
     }
 
-    private void establishCoordConnection(int coordinator) {
-        try {
-            coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-            coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
-            coordTcpListener.start();
-        } catch(IOException e) {
-            // Cannot connect to Coordinator -> Re-Election
-            System.out.println("Could not establish a connection with the coordinator. Let's trigger a re-election.");
-            initiateReElection();
-        }
+    private void establishCoordConnection(int coordinator) throws IOException {
+        coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
+        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
     }
 
     public void sendMessage(String message) {
@@ -86,7 +83,10 @@ public class Participant extends Role implements Runnable {
 
     public void close() {
         super.close();
-
+        if(listenerThread != null) {
+            listenerThread.interrupt();
+            listenerThread = null;
+        }
         if(coordTcpListener != null) {
             coordTcpListener.close();
             coordTcpListener = null;
@@ -113,6 +113,6 @@ public class Participant extends Role implements Runnable {
     }
 
     private void initiateReElection() {
-        node.reElection();
+        new Thread(() -> node.reElection(), "reElection-pc").start();
     }
 }

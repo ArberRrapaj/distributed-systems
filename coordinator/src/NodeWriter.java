@@ -1,3 +1,6 @@
+
+import com.oracle.tools.packager.IOUtils;
+
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 
@@ -8,7 +11,6 @@ public class NodeWriter extends Thread {
     private boolean running;
 
     public NodeWriter(Role role) {
-        setName("NodeWriter-"+role.getName());
         this.role = role;
         System.out.println("Node Writer active for node: " + role.getPort());
         inputScanner = new Scanner(System.in); // Create a Scanner object
@@ -34,6 +36,6 @@ public class NodeWriter extends Thread {
 
     public void close() {
         running = false;
-        inputScanner.close();
+        //inputScanner.close(); // TODO: seems to block reElection (close Responsibilities)
     }
 }

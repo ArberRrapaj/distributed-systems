@@ -2,7 +2,7 @@ public enum Status {
     COORDINATOR("COORDINATOR ME", false, -1),
     SEARCHING("I am searching", false, -1),
     WAITING("I am waiting", false, -1),
-    PARTICIPANT("No, I am no coordinator", false, -1),
+    PARTICIPANT("PARTICIPANT", false, -1),
     REQUEST("COORDINATOR SEARCH", false, -1),
     DEAD("I am dead.", false, -1),
     ELECTION("ELECTION", true, 0),

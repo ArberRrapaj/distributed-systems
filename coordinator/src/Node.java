@@ -1,3 +1,5 @@
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
+
 import java.io.*;
 import java.net.*;
 import java.nio.Buffer;
@@ -7,6 +9,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 
 import static java.lang.Thread.sleep;
 
@@ -91,52 +94,65 @@ public class Node extends Elector {
 
     private void evaluateSearchAnswers() {
 
-        try {
-            for (int trials = 0; trials < 20; trials++) {
-                Message received = multicaster.receive();
-
-                if (received.getText().startsWith(Status.COORDINATOR.toString())) {
-                    int coordinator = received.getSender();
-                    String coordinatorName = received.getText().split(" ")[2];
-                    becomeParticipant(coordinator, coordinatorName);
-                    return;
-                } else if (received.getText().equals(Status.SEARCHING.toString())) {
-                    // There is another mf, who is searching atm, so we wait and try again later
-                    status = Status.WAITING;
-
-                    new Thread(() -> {
-                        try {
-                            sleep(5000);
-                        } catch (InterruptedException e) {
-                            suicide();
-                        }
-                        getSearchClusterThread().start();
-                    }, "searchCluster").start();
-                    return;
-                }
+        for (int trials = 0; trials < 500; trials++) {
+            Message received = null; 
+            try {
+                received = multicaster.receive();
+            } catch (SocketTimeoutException e) {
+                break;
+            } catch (IOException e) {
+                suicide();
             }
-        } catch(SocketTimeoutException e) {
-            // The socket timed out => no answers were received -> proceed to create Cluster
-        } catch(IOException e) {
-            System.err.println("Failed to receive COORDINATOR REPLY ");
-            e.printStackTrace();
-            System.exit(1);
+            
+            if(received == null || received.getText().isEmpty()) {
+                continue;
+            } 
+                
+            if (received.getText().startsWith(Status.COORDINATOR.toString())) {
+                int coordinator = received.getSender();
+                String coordinatorName = received.getText().split(" ")[2];
+                try {
+                    becomeParticipant(coordinator, coordinatorName);
+                } catch (IOException e) {
+                    waitAndRedoSearch();
+                }
+                
+                return;
+            } else if (received.getText().equals(Status.SEARCHING.toString())) {
+                // There is another mf, who is searching atm, so we wait and try again later
+                status = Status.WAITING;
+                waitAndRedoSearch();
+                return;
+            }
         }
 
-
-        becomeCoordinator();
+        try {
+            becomeCoordinator();
+        } catch (IOException e) {
+            suicide();
+        }
     }
 
-    protected void becomeParticipant(int coordinator, String coordinatorName) {
+    private void waitAndRedoSearch() {
+        new Thread(() -> {
+            try {
+                sleep(5000);
+            } catch (InterruptedException e) {
+                suicide();
+            }
+            getSearchClusterThread().start();
+        }, "searchCluster").start();
+    }
+
+    protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
         Participant part = new Participant(this, coordinator, coordinatorName);
         role = part;
         new Thread(part, "Participant-"+name).start();
     }
 
-    protected void becomeCoordinator() {
+    protected void becomeCoordinator() throws IOException {
         Coordinator coordinator = new Coordinator(this);
         role = coordinator;
-        // start listening
         coordinatorThread = new Thread(coordinator, "Coordinator");
         coordinatorThread.start();
     }
@@ -191,9 +207,6 @@ public class Node extends Elector {
         if(status != Status.DEAD) {
             status = Status.DEAD;
             announceYourDeath();
-            try {
-                sleep(1000);
-            } catch (InterruptedException e) {}
             if(role != null) {
                 role.close();
                 role = null;
@@ -216,6 +229,9 @@ public class Node extends Elector {
     }
 
     public Status getStatus() {
+        if(role != null) {
+            return role.getStatus();
+        }
         return status;
     }
 

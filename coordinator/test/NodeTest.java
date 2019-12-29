@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NodeTest {
     private static List<Node> nodes;
     private static Random rand;
-    private Node coordinator;
+    private static Node coordinator;
 
     private static Set<Integer> availablePorts;
 
@@ -28,9 +28,16 @@ class NodeTest {
         for(int port = LOWER_PORT; port<=UPPER_PORT; port++) {
             availablePorts.add(port);
         }
+
+        try {
+            setupThreeNodeCluster();
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail(e);
+        }
     }
 
-    Node createAndStartNode(int port, String name) throws ConnectException {
+    private static Node createAndStartNode(int port, String name) throws ConnectException {
         Node node = new Node(port,name);
 
         Thread searchClusterTh = node.getSearchClusterThread();
@@ -44,13 +51,13 @@ class NodeTest {
         return node;
     }
 
-    @BeforeEach
-    void secondAndThirdNodeJoinCluster() throws IOException {
+    private static void setupThreeNodeCluster() throws IOException {
         Node node = createAndStartNode(getRandomPort(), "Alice");
         assertTrue(node.getClusterNames().isEmpty());
         coordinator = node;
 
         Node node2 = createAndStartNode(getRandomPort(), "Bob");
+        waitASec();
         assertFalse(node2.getClusterNames().isEmpty());
         assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node.getClusterNames().values().contains("Bob"));
@@ -58,6 +65,7 @@ class NodeTest {
         assertTrue(node2.getClusterNames().values().contains("Alice"));
 
         Node node3 = createAndStartNode(getRandomPort(), "Charlie");
+        waitASec();
         assertNotNull(node3.getClusterNames());
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
@@ -65,7 +73,7 @@ class NodeTest {
         assertTrue(node3.getClusterNames().values().contains("Bob"));
     }
 
-    private void waitASec() {
+    private static void waitASec() {
         try {
             sleep(1000);
         } catch (InterruptedException e) { System.exit(1); }
@@ -76,11 +84,12 @@ class NodeTest {
         coordinator.suicide();
         nodes.remove(coordinator);
         try {
-            sleep(20000);
+            sleep(12000);
         } catch (InterruptedException e) { System.exit(1); }
         assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
         assertTrue(nodes.stream().anyMatch(
                 x -> x.getRole().contains("Coordinator")));
+        assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
     }
 
 
@@ -92,7 +101,7 @@ class NodeTest {
 
     }
 
-    public int getRandomPort() {
+    private static int getRandomPort() {
         int index = rand.nextInt(availablePorts.size());
         Iterator<Integer> iter = availablePorts.iterator();
         for (int i = 0; i < index; i++) {

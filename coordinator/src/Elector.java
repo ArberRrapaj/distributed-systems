@@ -1,8 +1,12 @@
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
+
 import java.io.IOException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import static java.lang.Thread.getAllStackTraces;
 import static java.lang.Thread.sleep;
 
 public abstract class Elector {
@@ -10,33 +14,46 @@ public abstract class Elector {
     private volatile Map<Integer, Integer> electionCandidates; // port : writeIndex
     private volatile Map<Integer, String> candidateNames;
     private volatile Map<Integer, Integer> electionVotes; // port : numVotes
-
+    private Date lastElection;
 
     public void reElection() {
-        resetResponsibilities();
-        this.status = Status.ELECTION;
-        this.electionCandidates = new HashMap<>();
-        this.candidateNames = new HashMap<>();
-        this.electionVotes = new HashMap<>();
+        System.out.println(getName() + " issue reElection " + getStatus());
+        if(!getStatus().isInElection() && !hasRecentlyElected()) {
+            System.out.println(getName() + " start reElection " + getStatus());
+            resetResponsibilities();
+            this.status = Status.ELECTION;
+            lastElection = new Date();
+            this.electionCandidates = new HashMap<>();
+            this.candidateNames = new HashMap<>();
+            this.electionVotes = new HashMap<>();
 
-        advertiseElection();
+            advertiseElection();
 
-        new Thread(() -> {
-            try {
-                sleep(5000);
-            } catch (InterruptedException e) {
-                suicide();
-            }
+            new Thread(() -> {
+                try {
+                    sleep(5000);
+                } catch (InterruptedException e) {
+                    suicide();
+                }
 
-            evaluateElectionCandidates();
-        }, "evaluateElection").start();
-
+                evaluateElectionCandidates();
+            }, "evaluateElection").start();
+        }
     }
 
+    protected abstract Status getStatus();
     protected abstract void suicide();
     protected abstract void advertiseElection();
     protected abstract void resetResponsibilities();
     protected abstract int getLatestClusterSize();
+
+    private boolean hasRecentlyElected() {
+        if(lastElection == null) return false;
+        if((new Date().compareTo(lastElection)) < 2000) {
+            return true;
+        }
+        return false;
+    }
 
     public void documentCandidate(Message received) {
         // Format: ELECTION <Name> <writeIndex>
@@ -53,7 +70,7 @@ public abstract class Elector {
     }
 
     private void evaluateElectionCandidates() {
-        if(!status.isEvaluating()) {
+        if(!getStatus().isEvaluating()) {
             status = Status.EVALUATION;
             Map.Entry<Integer, Integer> bestCandidate = getBestCandidate();
             Map.Entry<Integer, Integer> myCandidature = getMyCandidature();
@@ -68,7 +85,11 @@ public abstract class Elector {
                     // impossible.
                 }
             } else {
-                promoteCandidate(electionCandidates.size(), myCandidature, getName());
+                try {
+                    becomeCoordinator();
+                } catch (IOException e) {
+                    suicide();
+                }
             }
 
 
@@ -124,23 +145,44 @@ public abstract class Elector {
     }
 
     private void evaluateVotes() {
-        if(status.hasElected()) {
+        if(getStatus().hasElected()) {
+            status = Status.EVALVOTES;
             Optional<Map.Entry<Integer, Integer>> voteWinner = electionVotes.entrySet().stream()
                     .max((c1, c2) -> compareTwoCandidates(c1, c2));
 
             Map.Entry<Integer, Integer> winner = voteWinner.orElse(null);
             if(winner == null || winner.getKey().equals(getPort())) {
-                becomeCoordinator();
+                try {
+                    becomeCoordinator();
+                } catch (IOException e) {
+                    suicide();
+                }
             } else {
-                becomeParticipant(winner.getKey(), candidateNames.getOrDefault(winner.getKey(), "UNKNOWN"));
+                try {
+                    becomeParticipant(winner.getKey(), candidateNames.getOrDefault(winner.getKey(), "UNKNOWN"));
+                } catch (IOException e) {
+                    waitAndRestartElection();
+                }
+
             }
         }
     }
 
+    private void waitAndRestartElection() {
+        new Thread(() -> {
+            try {
+                sleep(5000);
+            } catch (InterruptedException e) {
+                suicide();
+            }
+            reElection();
+        }, "reElection").start();
+    }
+
 
     public abstract int getPort();
-    protected abstract void becomeCoordinator();
-    protected abstract void becomeParticipant(int coordinator, String coordinatorName);
+    protected abstract void becomeCoordinator() throws IOException;
+    protected abstract void becomeParticipant(int coordinator, String coordinatorName) throws IOException;
 
 
 }
