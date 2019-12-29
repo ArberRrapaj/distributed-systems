@@ -1,4 +1,6 @@
 import com.sun.tools.internal.ws.wsdl.document.jaxws.Exception;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -9,18 +11,20 @@ import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.util.*;
 
+import static java.lang.Thread.sleep;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NodeTest {
     private static List<Node> nodes;
     private static Random rand;
+    private static Node coordinator;
 
     private static Set<Integer> availablePorts;
 
     private static final int LOWER_PORT = 5050;
     private static final int UPPER_PORT = 5250;
 
-    @org.junit.jupiter.api.BeforeAll
+    @BeforeAll
     static void setUp() {
         nodes = new ArrayList<>();
         rand = new Random();
@@ -29,38 +33,67 @@ class NodeTest {
         for(int port = LOWER_PORT; port<=UPPER_PORT; port++) {
             availablePorts.add(port);
         }
+
+        try {
+            setupThreeNodeCluster();
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail(e);
+        }
+    }
+  
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        /*
+        List<Node> delete = new ArrayList<Node>();
+        for(Node node : nodes){
+            node.close();
+            delete.add(node);
+        }
+        nodes.removeAll(delete);
+        */
     }
 
+    private static Node createAndStartNode(int port, String name) throws ConnectException {
+        Node node = new Node(port,name);
 
-    // @Test
-    void secondAndThirdNodeJoinCluster() throws IOException {
-        Node node = new Node(getRandomPort(), "Alice");
+        Thread searchClusterTh = node.getSearchClusterThread();
+        searchClusterTh.start();
+        try {
+            searchClusterTh.join();
+        } catch (InterruptedException e) {
+            fail("Waiting for search cluster.");
+        }
         nodes.add(node);
-        assertNotNull(node.getClusterNames());
-        assertTrue(node.getClusterNames().isEmpty());
+        return node;
+    }
 
-        Node node2 = new Node(getRandomPort(), "Bob");
-        nodes.add(node2);
-        assertNotNull(node2.getClusterNames());
+    private static void setupThreeNodeCluster() throws IOException {
+        Node node = createAndStartNode(getRandomPort(), "Alice");
+        assertTrue(node.getClusterNames().isEmpty());
+        coordinator = node;
+
+        Node node2 = createAndStartNode(getRandomPort(), "Bob");
+        waitASec();
+        assertFalse(node2.getClusterNames().isEmpty());
         assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node.getClusterNames().values().contains("Bob"));
         assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node2.getClusterNames().values().contains("Alice"));
 
-        Node node3 = new Node(getRandomPort(), "Charlie");
-        nodes.add(node3);
+        Node node3 = createAndStartNode(getRandomPort(), "Charlie");
+        waitASec();
         assertNotNull(node3.getClusterNames());
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
-        //assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
+        assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
 
         chillout(3000);
         assertTrue(node3.getClusterNames().values().contains("Bob"));
     }
-
+  
     // @Test
     void basicConversation() throws IOException {
-
         /*
         for (int i = 0; i < 2; i++) {
             nodes.add( new Node(getRandomPort(), "a" + i) );
@@ -89,7 +122,7 @@ class NodeTest {
         node1.close();
         node2.close();
     }
-
+  
     // @Test
     void initializeRightWriteIndex() throws IOException {
         Node nodeWithEntries = new Node(getRandomPort(), "nodeWithEntries");
@@ -109,7 +142,7 @@ class NodeTest {
         deleteMessagesFile("nodeWithoutFile");
         assertEquals(-1, nodeWithoutFile.initializeWriteIndex());
     }
-
+  
     // @Test
     void closeNode() throws ConnectException {
         Node node1 = new Node(getRandomPort(), "Abigail");
@@ -120,7 +153,7 @@ class NodeTest {
         node2 = null;
         node2.role.sendMessage("Hi");
     }
-
+  
     @Test
     void recoverFromDisconnect() throws ConnectException {
         deleteMessagesFile("Abigail");
@@ -153,20 +186,27 @@ class NodeTest {
 
         assertEquals(node3.getFileHash(), node2.getFileHash());
     }
-
-    @org.junit.jupiter.api.AfterEach
-    void tearDown() {
-        /*
-        List<Node> delete = new ArrayList<Node>();
-        for(Node node : nodes){
-            node.close();
-            delete.add(node);
-        }
-        nodes.removeAll(delete);
-        */
+  
+    // @Test
+    void killingCoordinatorTriggersReElection() throws IOException {
+        coordinator.suicide();
+        nodes.remove(coordinator);
+        try {
+            sleep(12000);
+        } catch (InterruptedException e) { System.exit(1); }
+        assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
+        assertTrue(nodes.stream().anyMatch(
+                x -> x.getRole().contains("Coordinator")));
+        assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
+    }
+  
+    private static void waitASec() {
+        try {
+            sleep(1000);
+        } catch (InterruptedException e) { System.exit(1); }
     }
 
-    public int getRandomPort() {
+    private static int getRandomPort() {
         int index = rand.nextInt(availablePorts.size());
         Iterator<Integer> iter = availablePorts.iterator();
         for (int i = 0; i < index; i++) {

@@ -1,4 +1,5 @@
 import javax.xml.bind.DatatypeConverter;
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
 import java.io.*;
 import java.net.*;
 import java.nio.Buffer;
@@ -9,9 +10,10 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.stream.Stream;
+import java.util.concurrent.TimeoutException;
+import static java.lang.Thread.sleep;
 
-
-public class Node extends Thread {
+public class Node extends Elector {
 
     // CONFIGURATION
     private static String IP = "localhost";
@@ -29,9 +31,8 @@ public class Node extends Thread {
     // Ports:
     private int coordinator;
     private int port;
-    public Map<Integer, String> getClusterNames() {
-        return role.getClusterNames();
-    }
+    private volatile int writeIndex;
+    private int latestClusterSize;
     // Connections:
     private ServerSocket newConnectionsSocket;
     // private NodeWriter writer;
@@ -40,6 +41,7 @@ public class Node extends Thread {
     private boolean running = true;
     public String name = null; // Public for testing purpose
     private Status status;
+    private Thread coordinatorThread;
 
 
     public static void main(String[] args) {
@@ -59,6 +61,8 @@ public class Node extends Thread {
 
             foundPort = true;
         }
+
+        // TODO: non-static getSearchClusterThread().start();
     }
 
     public Node(int port, String name) throws ConnectException {
@@ -70,65 +74,98 @@ public class Node extends Thread {
         initializeWriteIndex();
         writeAheadIndex = writeIndex;
         multicaster = new Multicaster(this, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
-
-        searchCluster();
-        multicaster.start();
     }
 
 
-    public void searchCluster() {
+    public Thread getSearchClusterThread() {
 
-        status = Status.SEARCHING; // Set the node's status to SEARCHING
+        status = Status.SEARCHING;
+        advertiseSearch();
+        return new Thread(() -> {
+            try {
+                sleep(3000);
+            } catch(InterruptedException e) {
+                suicide();
+            }
+            evaluateSearchAnswers();
+            multicaster.start();
+        }, "evaluateSearch");
+    }
 
+    private void advertiseSearch() {
         try {
-            multicaster.send(StandardMessages.CLUSTER_SEARCH.toString() + " " + name);
+            multicaster.send(Status.REQUEST.toString() + " " + name);
         } catch (IOException e) {
             System.err.println("Failed to send CLUSTER_SEARCH");
             e.printStackTrace();
             System.exit(1);
         }
-        try {
-            sleep(3000);
-        } catch(InterruptedException e) {
-            System.exit(1);
-        }
-
-        try {
-            for (int trials = 0; trials < 10; trials++) {
-                Message received = multicaster.receive();
-
-                if (received == null) continue; // own message
-                if (received.getText().startsWith(Status.COORDINATOR.toString())) {
-                    role = new Participant(this, received);
-                    return;
-                } else if (received.getText().equals(Status.SEARCHING.toString())) {
-                    // There is another mf, who is searching atm, so we wait and try again later
-                    status = Status.WAITING;
-
-                    sleep(5000);
-
-                    // Search again
-                    searchCluster();
-                    return;
-                }
-            }
-        } catch(SocketTimeoutException e) {
-            // The socket timed out => no answers were received -> proceed to create Cluster
-        } catch(InterruptedException | IOException e) {
-            System.err.println("Failed to receive COORDINATOR REPLY ");
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-
-        // no coordinator found... -> create
-        Coordinator coordinator = new Coordinator(this);
-        role = coordinator;
-        // start listening
-        Thread coordinatorThread = new Thread(coordinator);
-        coordinatorThread.start();
     }
 
+    private void evaluateSearchAnswers() {
+
+        for (int trials = 0; trials < 500; trials++) {
+            Message received = null; 
+            try {
+                received = multicaster.receive();
+            } catch (SocketTimeoutException e) {
+                break;
+            } catch (IOException e) {
+                suicide();
+            }
+            
+            if(received == null || received.getText().isEmpty()) {
+                continue;
+            } 
+                
+            if (received.getText().startsWith(Status.COORDINATOR.toString())) {
+                int coordinator = received.getSender();
+                String coordinatorName = received.getText().split(" ")[2];
+                try {
+                    becomeParticipant(coordinator, coordinatorName);
+                } catch (IOException e) {
+                    waitAndRedoSearch();
+                }
+                
+                return;
+            } else if (received.getText().equals(Status.SEARCHING.toString())) {
+                // There is another mf, who is searching atm, so we wait and try again later
+                status = Status.WAITING;
+                waitAndRedoSearch();
+                return;
+            }
+        }
+
+        try {
+            becomeCoordinator();
+        } catch (IOException e) {
+            suicide();
+        }
+    }
+
+    private void waitAndRedoSearch() {
+        new Thread(() -> {
+            try {
+                sleep(5000);
+            } catch (InterruptedException e) {
+                suicide();
+            }
+            getSearchClusterThread().start();
+        }, "searchCluster").start();
+    }
+
+    protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
+        Participant part = new Participant(this, coordinator, coordinatorName);
+        role = part;
+        new Thread(part, "Participant-"+name).start();
+    }
+
+    protected void becomeCoordinator() throws IOException {
+        Coordinator coordinator = new Coordinator(this);
+        role = coordinator;
+        coordinatorThread = new Thread(coordinator, "Coordinator");
+        coordinatorThread.start();
+    }
 
 
     public void answerSearchRequest(Message message) {
@@ -152,6 +189,115 @@ public class Node extends Thread {
 
     public int getPort() {
         return port;
+    }
+
+    public Map<Integer, String> getClusterNames() {
+        if(role != null) {
+            return role.getClusterNames();
+        }
+        return null;
+    }
+
+    public String getRole() {
+        if(role != null) {
+            return role.getClass().toString();
+        }
+        return null;
+    }
+
+    public void announceYourDeath() {
+        try {
+            this.multicaster.send(Status.DEAD.toString() + " " + name);
+        } catch (NullPointerException | IOException e) {
+            // We did all we could...
+        }
+    }
+
+    public void suicide() {
+        if(status != Status.DEAD) {
+            status = Status.DEAD;
+            announceYourDeath();
+            if(role != null) {
+                role.close();
+                role = null;
+            }
+            if(multicaster != null) {
+                multicaster.close();
+                multicaster = null;
+            }
+        }
+    }
+
+    public void handleDeathOf(Integer port) {
+        role.handleDeathOf(port);
+    }
+
+
+    public int getWriteIndex() {
+        System.err.println("getCurrentIndex() not implemented.");
+        return writeIndex;
+    }
+
+    public Status getStatus() {
+        if(role != null) {
+            return role.getStatus();
+        }
+        return status;
+    }
+
+
+
+    // ELECTION
+
+    @Override
+    protected void resetResponsibilities() {
+        if(this.role != null) {
+            this.role.close();
+            this.role = null;
+        }
+    }
+
+    protected void advertiseElection() {
+        if(!status.hasAdvertised()) {
+            try {
+                multicaster.send(Status.ELECTION.toString() + " " + name + " " + writeIndex);
+                status = Status.ADVERTISED;
+            } catch (IOException e) {
+                suicide();
+            }
+        }
+    }
+
+    public void setLatestClusterSize(int latestClusterSize) {
+        this.latestClusterSize = latestClusterSize;
+    }
+
+    @Override
+    protected int getLatestClusterSize() {
+        return latestClusterSize;
+    }
+
+    @Override
+    protected String getName() {
+        return name;
+    }
+
+    @Override
+    protected Map.Entry<Integer, Integer> getMyCandidature() {
+        return new HashMap.SimpleEntry<>(this.port, this.writeIndex);
+    }
+
+    protected void promoteCandidate(int numReceived, Map.Entry<Integer, Integer> candidate, String cName) {
+        status = Status.ELECTED;
+        int cPort = candidate.getKey();
+        int writeIndex = candidate.getValue();
+        try {
+            // Format: ELECT <numReceived> <port> <name> <writeIndex>
+            multicaster.send(Status.ELECTED.toString()
+                    + " " + numReceived + " " + cPort + " " + cName + " " + writeIndex);
+        } catch (IOException e) {
+            suicide();
+        }
     }
 
 

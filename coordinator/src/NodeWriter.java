@@ -1,6 +1,9 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
+import com.oracle.tools.packager.IOUtils;
+
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.*;
 
@@ -51,7 +54,7 @@ public class NodeWriter extends Thread {
 
     public void close() {
         running = false;
-        inputScanner.close();
         System.out.println(role.node.name + ": NodeWriter closed");
+        // inputScanner.close(); // TODO: seems to block reElection (close Responsibilities)
     }
 }

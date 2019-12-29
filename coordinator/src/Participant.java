@@ -3,24 +3,32 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.util.HashMap;
 
-public class Participant extends Role {
+public class Participant extends Role implements Runnable {
 
     private final Status status = Status.PARTICIPANT;
 
-    private int coordinator;
+    private Integer coordinator;
+    private String coordinatorName;
 
     private TcpWriter coordTcpWriter;
     private TcpListener coordTcpListener;
+    private Thread listenerThread;
 
-    public Participant(Node node, Message coordAnswer) {
+    public Participant(Node node, int coordinator, String coordinatorName) throws IOException {
         super(node);
-        joinCluster(coordAnswer);
+        this.coordinator = coordinator;
+        this.coordinatorName = coordinatorName;
+
+        joinCluster(coordinator, coordinatorName);
     }
 
-    private void joinCluster(Message answer) {
+    public void run() {
+        listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
+        listenerThread.start();
+    }
+
+    private void joinCluster(int coordinator, String coordinatorName) throws IOException {
         clusterNames = new HashMap<>();
-        coordinator = answer.getSender();
-        String coordinatorName = answer.getText().split(" ")[2];
         addToCluster(coordinator, coordinatorName);
 
         System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinatorName + " " + coordinator);
@@ -30,17 +38,10 @@ public class Participant extends Role {
 
     }
 
-    private void establishCoordConnection(int coordinator) {
-        try {
-            coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-            coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
-            coordTcpListener.start();
-            nodeWriter.start();
-        } catch(IOException e) {
-            // Cannot connect to Coordinator -> Re-Election
-            // TODO: Re-Election
-            System.out.println("Could not establish a connection with the coordinator. Let's trigger a re-election.");
-        }
+
+    private void establishCoordConnection(int coordinator) throws IOException {
+        coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
+        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
     }
 
     public void sendMessage(String message) {
@@ -70,6 +71,7 @@ public class Participant extends Role {
                     }
                 }
             }
+          node.setLatestClusterSize(clusterNames.size());
         } else if (message.startsWith(StandardMessages.WANNA_SEND_RESPONSE.toString())) {
             message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
             try {
@@ -87,24 +89,45 @@ public class Participant extends Role {
     }
 
     public void listenerDied(int port) {
-        coordTcpListener.close();
-        coordTcpListener = null;
+        close();
         System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
-        // TODO: initiateElection();
+        initiateReElection();
     }
-
 
 
     public void close() {
         super.close();
+        if(listenerThread != null) {
+            listenerThread.interrupt();
+            listenerThread = null;
+        }
+        if(coordTcpListener != null) {
+            coordTcpListener.close();
+            coordTcpListener = null;
+        }
 
-        // Close the TCP connection to the coordinator
-        coordTcpWriter.close();
-        coordTcpListener.close();
+        if (coordTcpWriter != null) {
+            coordTcpWriter.close();
+            coordTcpWriter.close(); // TODO: why twice?
+        }
         System.out.println(node.name + ": Participant closed");
     }
 
     public Status getStatus() {
         return status;
+    }
+
+    @Override
+    public void handleDeathOf(Integer port) {
+        if(coordinator.equals(port)) {
+            coordinator = null;
+            initiateReElection();
+        } else {
+            clusterNames.remove(port);
+        }
+    }
+
+    private void initiateReElection() {
+        new Thread(() -> node.reElection(), "reElection-pc").start();
     }
 }
