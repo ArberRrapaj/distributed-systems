@@ -35,6 +35,10 @@ public abstract class Role {
 
     public abstract void sendMessage(String message);
 
+    public void requestMessage(Integer messageIndex) {
+        sendMessage(StandardMessages.REQUEST_MESSAGE.toString() + " " + messageIndex);
+    }
+
     public abstract void actionOnMessage(Message message);
 
     public abstract void listenerDied(int port);
@@ -63,6 +67,7 @@ public abstract class Role {
 
 
     protected void close() {
+
         if(nodeWriterThread != null) {
             nodeWriterThread.interrupt();
             nodeWriterThread = null;
@@ -71,6 +76,7 @@ public abstract class Role {
             nodeWriter.close();
             nodeWriter = null;
         }
+        System.out.println(node.name + ": Role closed");
     }
 
     public abstract Status getStatus();

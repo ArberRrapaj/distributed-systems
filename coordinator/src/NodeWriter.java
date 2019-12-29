@@ -1,8 +1,11 @@
-
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.io.IOException;
 import com.oracle.tools.packager.IOUtils;
 
 import java.util.NoSuchElementException;
 import java.util.Scanner;
+import java.util.concurrent.*;
 
 public class NodeWriter extends Thread {
 
@@ -18,15 +21,30 @@ public class NodeWriter extends Thread {
 
     public void getInput() {
         while (running) {
-            System.out.print("\n What do you want to send the other nodes?: ");
+            System.out.print("\n What do you want to send to the other nodes?: ");
+            String message = null;
             try {
-                String message = inputScanner.nextLine(); // Read user input
-                role.sendMessage(message);
-            } catch (NoSuchElementException e) {
-                role.close();
+                while (hasNextLine()) {
+                    message = inputScanner.nextLine();
+                    role.sendMessage(message);
+                }
+            } catch (IOException e) {
+                running = false;
             }
         }
         inputScanner.close();
+    }
+
+    private boolean hasNextLine() throws IOException {
+        while (System.in.available() == 0) {
+            try {
+                sleep(50);
+            } catch (InterruptedException e) {
+                System.out.println("Thread is interrupted.. breaking from loop");
+                return false;
+            }
+        }
+        return inputScanner.hasNextLine();
     }
 
     public void run() {
@@ -36,6 +54,7 @@ public class NodeWriter extends Thread {
 
     public void close() {
         running = false;
-        //inputScanner.close(); // TODO: seems to block reElection (close Responsibilities)
+        System.out.println(role.node.name + ": NodeWriter closed");
+        // inputScanner.close(); // TODO: seems to block reElection (close Responsibilities)
     }
 }

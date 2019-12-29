@@ -2,6 +2,8 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,6 +67,7 @@ public class Coordinator extends Role implements Runnable {
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
                 System.out.println("New Connection: " + newSocket);
                 TcpListener newTcpListener = new TcpListener(this, node, newSocket);
+
                 int port = newSocket.getPort();
                 clusterListeners.put(port, newTcpListener);
                 listenerThreads.put(port, new Thread(newTcpListener, "TcpListener-"+node.getName()+"-"+port));
@@ -109,12 +112,38 @@ public class Coordinator extends Role implements Runnable {
 
 
     public void sendMessage(String message) {
-        //TODO: Implement send Message – reserve index for yourself and send without request
+        // TODO: Implement send Message – reserve index for yourself and send without request
+        // No need to ask for timestamp, write ahead and send to other nodes
+        try {
+            Message newMessage = new Message(node.getPort(), node.getNewWriteAheadIndex(), node.name, new Timestamp(new Date().getTime()).toString(), message);
+            node.multicaster.send(newMessage.asNewMessage());
+            // TODO: Do it like this or use existing listen() in multicaster?
+            node.messageQueue.handleNewMessage(newMessage);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            // try again
+        }
+    }
+
+    public void sendMessageTo(int port, String message) {
+        TcpWriter writer = clusterWriters.get(port);
+        if (writer != null) writer.write(message);
     }
 
     public void actionOnMessage(Message message) {
         System.out.println("Coordinator action on " + message);
 
+        if (message.startsWith(StandardMessages.WANNA_SEND_MESSAGE.toString())) {
+            String content = message.toString().substring(StandardMessages.WANNA_SEND_MESSAGE.length() + 1);
+            System.out.println(content + "/");
+            String[] contentSplit = content.split("\\$", 2); // [0] = Name; [1] = Message
+            message.setName(contentSplit[0]);
+            message.setText(contentSplit[1]);
+            message.setIndex(node.getNewWriteAheadIndex());
+            message.setTimestamp(new Timestamp(new Date().getTime()).toString());
+            sendMessageTo(message.getSender(), message.asWannaSendResponse());
+        }
         /* from ClusterNodeListener
         if (nextLine.equals(StandardMessages.SEND_FILE_HASH.toString())) {
             clusterNode.write(StandardMessages.ANSWER_TIME.toString());
@@ -149,7 +178,6 @@ public class Coordinator extends Role implements Runnable {
             return "THANKS";
         }
         */
-
     }
 
     public void killClusterNode(int port) {
