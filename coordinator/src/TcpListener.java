@@ -9,7 +9,7 @@ public class TcpListener extends Thread {
     protected BufferedReader in;
     private Role role;
     private Node node;
-    private Socket socket;
+    Socket socket;
     private volatile boolean listening = true;
 
     public TcpListener(Role role, Node node, Socket socket) throws IOException {
@@ -26,7 +26,7 @@ public class TcpListener extends Thread {
             listening = false;
             System.out.println("Seems like my true love, port " + socket.getPort() + " has just died. That means, me, the TcpListener of " + node.getName() + " will die now too, see you in hell.");
             try {
-                // if (in != null) in.close(); // TODO: blocks
+                if (in != null) in.close(); // TODO: blocks
                 socket.close();
             } catch (IOException e) {
                 // e.printStackTrace();
@@ -50,6 +50,7 @@ public class TcpListener extends Thread {
                     role.actionOnMessage(message);
                 }
             } catch (IOException ioe) {
+                System.out.println(node.name + ": TcpListener-RUN Exception");
                 role.listenerDied(socket.getPort());
             }
         }

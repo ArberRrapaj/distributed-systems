@@ -91,7 +91,7 @@ public class Participant extends Role implements Runnable {
     public void listenerDied(int port) {
         close();
         System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
-        initiateReElection();
+        // initiateReElection(); TODO: Why?
     }
 
 

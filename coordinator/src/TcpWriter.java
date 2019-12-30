@@ -74,7 +74,7 @@ public class TcpWriter extends Thread {
     public void close() {
         try {
             if (listener != null) listener.close();
-            // if (in != null) in.close(); // TODO: blocks
+            if (in != null) in.close(); // TODO: blocks
             if (out != null) out.close();
             if (socket != null) socket.close();
             System.out.println(node.name + ": TcpWriter closed");

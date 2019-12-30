@@ -40,7 +40,7 @@ public class NodeWriter extends Thread {
             try {
                 sleep(50);
             } catch (InterruptedException e) {
-                System.out.println("Thread is interrupted.. breaking from loop");
+                System.out.println("NodeWriter is interrupted.. breaking from loop");
                 return false;
             }
         }

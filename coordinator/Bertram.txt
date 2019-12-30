@@ -1,3 +1,4 @@
-0 Abigail 2019-12-30 01:08:59.847 Nachricht #1 von Abigail(Koordinator)
-1 Bertram 2019-12-30 01:08:59.85 Nachricht #2 von Betram
-2 Bertram 2019-12-30 01:08:59.85 Nachricht #3 von Bertram
+0 Abigail 2019-12-30 19:06:57.999 Nachricht #1 von Koordinator
+1 Bertram 2019-12-30 19:06:58.002 Nachricht #2 von Bertram
+2 Camille 2019-12-30 19:06:58.509 Nachricht #3 von Camille
+3 Bertram 2019-12-30 19:07:01.783 Nachricht #4 von Betram, nach Disconnect

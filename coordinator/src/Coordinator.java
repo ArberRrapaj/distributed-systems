@@ -14,7 +14,7 @@ public class Coordinator extends Role implements Runnable {
 
     private ServerSocket newConnectionsSocket;
     private Map<Integer, TcpWriter> clusterWriters;
-    private Map<Integer, TcpListener> clusterListeners;
+    Map<Integer, TcpListener> clusterListeners;
     private Map<Integer, Thread> listenerThreads;
 
     private volatile boolean listening;
@@ -101,7 +101,7 @@ public class Coordinator extends Role implements Runnable {
         return message.toString();
     }
 
-    private void shareUpdatedClusterInfo() {
+    void shareUpdatedClusterInfo() {
         String message = getCurrentClusterInfo();
 
         for(TcpWriter writer : clusterWriters.values()) {
@@ -129,6 +129,7 @@ public class Coordinator extends Role implements Runnable {
     public void sendMessageTo(int port, String message) {
         TcpWriter writer = clusterWriters.get(port);
         if (writer != null) writer.write(message);
+        else System.out.println(node.name + ": writer is null for sendMessageTo");
     }
 
     public void actionOnMessage(Message message) {
@@ -181,6 +182,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void killClusterNode(int port) {
+        System.out.println("killing: " + port);
         clusterNames.remove(port);
 
         TcpWriter writerToRemove = clusterWriters.getOrDefault(port, null);
@@ -198,6 +200,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void listenerDied(int port) {
+        System.out.println(node.name + ": Coordinator-Listener died");
         killClusterNode(port);
         shareUpdatedClusterInfo();
     }
