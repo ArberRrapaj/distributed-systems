@@ -113,6 +113,6 @@ public class Participant extends Role implements Runnable {
     }
 
     private void initiateReElection() {
-        new Thread(() -> node.reElection(), "reElection-pc").start();
+        new Thread(() -> node.reElection(), "reElection-pc-"+node.getName()).start();
     }
 }

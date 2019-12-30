@@ -18,16 +18,20 @@ public abstract class Elector {
 
     public void reElection() {
         System.out.println(getName() + " issue reElection " + getStatus());
-        if(!getStatus().isInElection() && !hasRecentlyElected()) {
-            System.out.println(getName() + " start reElection " + getStatus());
-            resetResponsibilities();
+        if(!getStatus().isInElection() && !hasRecentlyElected()
+                && getStatus() != Status.DEAD) {
+
             this.status = Status.ELECTION;
             lastElection = new Date();
+
             this.electionCandidates = new HashMap<>();
             this.candidateNames = new HashMap<>();
             this.electionVotes = new HashMap<>();
 
+            System.out.println(getName() + " start reElection " + getStatus());
+
             advertiseElection();
+            resetResponsibilities();
 
             new Thread(() -> {
                 try {
@@ -56,16 +60,18 @@ public abstract class Elector {
     }
 
     public void documentCandidate(Message received) {
-        // Format: ELECTION <Name> <writeIndex>
-        String[] receiveSplit = received.split(" ");
-        int port = received.getSender();
-        String name = receiveSplit[1];
-        Integer writeIndex = Integer.parseInt(receiveSplit[2]);
+        if(getStatus().isInElection()) {
+            // Format: ELECTION <Name> <writeIndex>
+            String[] receiveSplit = received.split(" ");
+            int port = received.getSender();
+            String name = receiveSplit[1];
+            Integer writeIndex = Integer.parseInt(receiveSplit[2]);
 
-        candidateNames.put(port, name);
-        electionCandidates.put(port, writeIndex);
-        if(electionCandidates.size() + 1 >= 0.8 * getLatestClusterSize()) {
-            evaluateElectionCandidates();
+            candidateNames.put(port, name);
+            electionCandidates.put(port, writeIndex);
+            if(electionCandidates.size() + 1 >= 0.8 * getLatestClusterSize()) {
+                evaluateElectionCandidates();
+            }
         }
     }
 
