@@ -50,8 +50,8 @@ public class Multicaster extends Thread {
             }
             try {
                Message received = receive();
-               // if (received == null); // System.out.println("I've received my own message from multicast");
-               if(!received.getText().isEmpty()) {
+               if (received == null); // System.out.println("I've received my own message from multicast");
+               else if (!received.getText().isEmpty()) {
                    if (received.startsWith(Status.REQUEST.toString())) {
                        node.answerSearchRequest(received);
                    } else if (received.startsWith(Status.DEAD.toString())) {
@@ -81,7 +81,6 @@ public class Multicaster extends Thread {
                // nothing received, repeat
            } catch(IOException e) {
                System.out.println(node.name + ": Socket closed");
-               running = false;
                // e.printStackTrace();
                node.suicide();
            }
@@ -127,7 +126,6 @@ public class Multicaster extends Thread {
     public void close() {
         listening = false;
         try {
-            running = false;
             mcSocket.leaveGroup(mcGroup);
             mcSocket.close();
         } catch (SocketException e) {

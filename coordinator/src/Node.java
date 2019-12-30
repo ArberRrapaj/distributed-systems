@@ -31,7 +31,7 @@ public class Node extends Elector {
     // Ports:
     private int coordinator;
     private int port;
-    private volatile int writeIndex;
+    // private volatile int writeIndex; TODO: merge relic
     private int latestClusterSize;
     // Connections:
     private ServerSocket newConnectionsSocket;

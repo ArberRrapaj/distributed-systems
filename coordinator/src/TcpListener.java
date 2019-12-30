@@ -36,6 +36,7 @@ public class TcpListener extends Thread {
         System.out.println(node.name + ": TcpListener closed");
     }
 
+    // TODO: call handleDeathOf as coordinator when fails
     public void run() {
         System.out.println("Me, a TcpListener will listen to (external) " + socket.getPort() + " on port (internal): " + socket.getLocalPort());
         while (listening) {

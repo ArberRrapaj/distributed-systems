@@ -30,7 +30,6 @@ public abstract class Role {
         nodeWriter = new NodeWriter(this);
         nodeWriterThread = new Thread(nodeWriter, "NodeWriter-"+node.getName());
         nodeWriterThread.start();
-
     }
 
     public abstract void sendMessage(String message);
