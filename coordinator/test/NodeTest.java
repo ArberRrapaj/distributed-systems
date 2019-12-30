@@ -143,7 +143,7 @@ class NodeTest {
         nodeWithoutFile.close();
     }
   
-    // @Test
+    @Test
     void closeNode() throws ConnectException {
         Node node1 = createAndStartNode(getRandomPort(), "Abigail");
         System.out.println(node1.role.printCurrentlyConnected());
@@ -158,13 +158,13 @@ class NodeTest {
         System.out.println(node2.role);
         System.out.println(node1.role.printCurrentlyConnected());
         Coordinator coordinator = (Coordinator) node1.role;
-        coordinator.shareUpdatedClusterInfo();
+        // coordinator.shareUpdatedClusterInfo();
         TcpListener listener = coordinator.clusterListeners.get(coordinator.clusterListeners.keySet().toArray()[0]);
         System.out.println("Socket is closed: " + listener.socket.isClosed());
         System.out.println("Socket is connected: " + listener.socket.isConnected());
     }
   
-    @Test
+    // @Test
     void recoverFromDisconnect() throws ConnectException {
         deleteMessagesFile("Abigail");
         deleteMessagesFile("Bertram");

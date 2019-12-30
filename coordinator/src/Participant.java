@@ -41,7 +41,7 @@ public class Participant extends Role implements Runnable {
 
     private void establishCoordConnection(int coordinator) throws IOException {
         coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
+        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket(), coordinator);
     }
 
     public void sendMessage(String message) {
@@ -76,7 +76,6 @@ public class Participant extends Role implements Runnable {
             message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
             try {
                 node.multicaster.send(message.asNewMessage());
-                // TODO: Do it like this or use existing listen() in multicaster?
                 node.messageQueue.handleNewMessage(message);
             } catch (IOException e) {
                 e.printStackTrace();

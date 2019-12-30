@@ -66,9 +66,9 @@ public class Coordinator extends Role implements Runnable {
                 System.out.println("I'll be listening for new connections on port: " + node.getPort());
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
                 System.out.println("New Connection: " + newSocket);
-                TcpListener newTcpListener = new TcpListener(this, node, newSocket);
-
                 int port = newSocket.getPort();
+                TcpListener newTcpListener = new TcpListener(this, node, newSocket, port);
+
                 clusterListeners.put(port, newTcpListener);
                 listenerThreads.put(port, new Thread(newTcpListener, "TcpListener-"+node.getName()+"-"+port));
                 listenerThreads.get(port).start();
@@ -93,7 +93,7 @@ public class Coordinator extends Role implements Runnable {
         /* Message is of format:
            CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
         */
-        StringBuilder message = new StringBuilder("CLUSTER " + getWriteIndex());
+        StringBuilder message = new StringBuilder("CLUSTER " + node.getCurrentWriteIndex());
         for (Integer port : clusterNames.keySet()) {
             message.append(" " + clusterNames.get(port) + " " + port);
         }
@@ -200,7 +200,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void listenerDied(int port) {
-        System.out.println(node.name + ": Coordinator-Listener died");
+        System.out.println(node.name + ": Coordinator-Listener died with port: " + port);
         killClusterNode(port);
         shareUpdatedClusterInfo();
     }

@@ -54,10 +54,12 @@ public class Node extends Elector {
             // Create new Node with that port
             try {
                 node = new Node(port, "Bertram");
+                /*
                 Thread searchClusterTh = node.getSearchClusterThread();
                 searchClusterTh.start();
                 searchClusterTh.join();
-            } catch(ConnectException | InterruptedException e) {
+                */
+            } catch(ConnectException e) {
                 e.printStackTrace();
                 continue;
             }
