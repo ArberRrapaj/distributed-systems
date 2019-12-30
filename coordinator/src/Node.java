@@ -261,7 +261,7 @@ public class Node extends Elector {
     }
 
     protected void advertiseElection() {
-        if(!status.hasAdvertised()) {
+        if(!getStatus().hasAdvertised() && getStatus().notDead() && multicaster != null) {
             try {
                 multicaster.send(Status.ELECTION.toString() + " " + name + " " + writeIndex);
                 status = Status.ADVERTISED;

@@ -41,6 +41,10 @@ public enum Status {
         return inElection && electionseqNum > 2;
     }
 
+    public boolean notDead() {
+        return this.equals(Status.DEAD);
+    }
+
 
 
 }
