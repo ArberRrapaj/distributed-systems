@@ -49,7 +49,7 @@ public abstract class Role {
 
     public int printCurrentlyConnected() {
         int connectedUsers = clusterNames.keySet().size();
-        System.out.println("Cluster status:");
+        System.out.println(node.name + ": Cluster status:");
         switch (connectedUsers) {
             case 0:
                 System.out.println("  --> I have no gang");

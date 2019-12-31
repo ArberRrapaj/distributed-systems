@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static java.lang.Thread.sleep;
 
@@ -96,13 +97,17 @@ public class Coordinator extends Role implements Runnable {
         shareUpdatedClusterInfo();
     }
 
+    /* Message is of format:
+        CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
+    */
     private String getCurrentClusterInfo() {
-        // TODO: use upon newly established or broken Socket Connnection -> Share among all
-        /* Message is of format:
-           CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
-        */
+        // TODO: use upon broken Socket Connnection -> Share among all
+
         StringBuilder message = new StringBuilder("CLUSTER " + node.getCurrentWriteIndex());
-        for (Integer port : clusterNames.keySet()) {
+        Set<Integer> portSet = clusterNames.keySet();
+        node.setLatestClusterSize(portSet.size());
+
+        for (Integer port : portSet) {
             message.append(" " + clusterNames.get(port) + " " + port);
         }
 
@@ -113,7 +118,7 @@ public class Coordinator extends Role implements Runnable {
         String message = getCurrentClusterInfo();
 
         for(TcpWriter writer : clusterWriters.values()) {
-            writer.write(message.toString());
+            writer.write(message);
         }
 
     }

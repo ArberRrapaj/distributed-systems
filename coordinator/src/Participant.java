@@ -79,7 +79,9 @@ public class Participant extends Role implements Runnable {
                 String[] messageSplit = message.split(" ");
                 int coordinatorsIndex = Integer.parseInt(messageSplit[1]);
                 // TODO: check coordinatorsIndex ?<=>? myIndex
+                clusterNames.clear();
 
+                addToCluster(coordinator, coordinatorName);
                 if (messageSplit.length > 2) {
                     for (int i = 2; i < messageSplit.length; i += 2) {
                         int port = Integer.valueOf(messageSplit[i + 1]);

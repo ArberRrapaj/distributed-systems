@@ -91,6 +91,7 @@ class NodeTest {
         assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
         assertTrue(node3.getClusterNames().values().contains("Bob"));
+        System.out.println("\n\n\nThree node cluster - setup complete");
     }
   
     // @Test
@@ -188,10 +189,45 @@ class NodeTest {
         node2.close();
         node1.close();
         chillout(1000);
+    }
 
+    @Test
+    void correctClusterSizeCommunication() throws ConnectException {
+        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        chillout(200);
+        assertEquals(0, node1.getLatestClusterSize());
+
+        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        chillout(200);
+        assertEquals(1, node1.getLatestClusterSize());
+        assertEquals(1, node2.getLatestClusterSize());
+
+        Node node3 = createAndStartNode(getRandomPort(), "Camille");
+        chillout(200);
+        assertEquals(2, node1.getLatestClusterSize());
+        assertEquals(2, node2.getLatestClusterSize());
+        assertEquals(2, node3.getLatestClusterSize());
+
+        /*
+        node1.close();
+        chillout(1000);
+        assertEquals(1, node2.getLatestClusterSize());
+        assertEquals(1, node3.getLatestClusterSize());
+        */
+
+        node2.close();
+        chillout(200);
+        assertEquals(1, node1.getLatestClusterSize());
+        assertEquals(1, node3.getLatestClusterSize());
+
+        node2 = createAndStartNode(getRandomPort(), "Bertram");
+        chillout(200);
+        assertEquals(2, node1.getLatestClusterSize());
+        assertEquals(2, node2.getLatestClusterSize());
+        assertEquals(2, node3.getLatestClusterSize());
     }
   
-    // @Test
+    //@Test
     void killingCoordinatorTriggersReElection() throws IOException {
         try {
             setupThreeNodeCluster();
