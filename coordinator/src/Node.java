@@ -365,19 +365,37 @@ public class Node extends Elector {
     public String lookForIndexInFile(int index) {
         File file = new File(name + ".txt");
 
-        try(BufferedReader br = new BufferedReader(new FileReader(file))) {
-            for(String line; (line = br.readLine()) != null; ) {
-                int lineIndex = Integer.parseInt(line.split(" ", 2)[0]);
-                if (index == lineIndex) {
-                    Message messageToReturn = new Message(getPort(), line);
-                    return messageToReturn.fileLineToRequested();
+        if (file.exists()) {
+            try(BufferedReader br = new BufferedReader(new FileReader(file))) {
+                for(String line; (line = br.readLine()) != null; ) {
+                    if (!line.trim().equals("")) {
+                        int lineIndex = Integer.parseInt(line.split(" ", 2)[0]);
+                        if (index == lineIndex) {
+                            Message messageToReturn = new Message(getPort(), line);
+                            return messageToReturn.fileLineToRequested();
+                        }
+                        // messageQueue.putIntoMessages(lineIndex, line);
+                    }
                 }
-                // messageQueue.putIntoMessages(lineIndex, line);
+                return null;
+            } catch (FileNotFoundException e) {
+                // e.printStackTrace();
+                return null;
+            } catch (IOException e) {
+                // e.printStackTrace();
+                return null;
             }
-            return null;
+        } else return null;
+    }
+
+    public boolean deleteMessagesFile() {
+        File file = new File(name + ".txt");
+        try {
+            return Files.deleteIfExists(file.toPath());
         } catch (IOException e) {
             // e.printStackTrace();
-            return null;
+            System.out.println("Couldn't delete file, flop");
+            return false;
         }
     }
 
@@ -424,7 +442,7 @@ public class Node extends Elector {
     }
 
     public void close() {
-        System.out.println("Closing node");
+        System.out.println(name + ": Closing node");
         multicaster.close();
         role.close();
         System.out.println(name + ": Node closed");

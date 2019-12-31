@@ -1,7 +1,12 @@
+import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.HashMap;
@@ -21,6 +26,8 @@ public class Coordinator extends Role implements Runnable {
     private Map<Integer, TcpWriter> introductionWriters;
     private Map<Integer, TcpListener> introductionListeners;
     private Map<Integer, Thread> introductionListenerThreads;
+
+    private Map<Integer, File> tempFiles;
 
     private volatile boolean listening;
 
@@ -58,6 +65,8 @@ public class Coordinator extends Role implements Runnable {
         introductionWriters = new HashMap<>();
         introductionListeners = new HashMap<>();
         introductionListenerThreads = new HashMap<>();
+
+        tempFiles = new HashMap<>();
     }
 
     public void run() {
@@ -81,7 +90,7 @@ public class Coordinator extends Role implements Runnable {
                 introductionListeners.put(port, newTcpListener);
                 introductionListenerThreads.put(port, new Thread(newTcpListener, "TcpListener-" + node.getName() + "-" + port));
                 introductionListenerThreads.get(port).start();
-                TcpWriter newTcpWriter = new TcpWriter(newSocket, node);
+                TcpWriter newTcpWriter = new TcpWriter(newSocket, this, node);
                 introductionWriters.put(port, newTcpWriter);
 
                 // welcomeNewNodeToCluster();
@@ -154,7 +163,7 @@ public class Coordinator extends Role implements Runnable {
                 System.out.println(node.name + ": got an introduction from participant");
 
                 String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_PARTICIPANT);
-                String[] contentSplit = content.split("\\$", 2);
+                String[] contentSplit = content.split("\\$", 4); // 0 = Port, 1 = Name, 2 = ParticipantWriteIndex, 3 = line
                 int actualPort = Integer.parseInt(contentSplit[0]);
                 // TcpListener
                 TcpListener listener = introductionListeners.get(localSenderPort);
@@ -167,16 +176,76 @@ public class Coordinator extends Role implements Runnable {
                 listenerThread.setName("TcpListener-" + node.getName() + "-" + actualPort);
                 introductionListenerThreads.remove(localSenderPort);
                 listenerThreads.put(actualPort, listenerThread);
-                listener.informationExchanged = true;
+                // listener.informationExchanged = true;
 
                 // TcpWriter
                 TcpWriter writer = introductionWriters.get(localSenderPort);
                 introductionWriters.remove(localSenderPort);
+                writer.setId(actualPort);
                 clusterWriters.put(actualPort, writer);
 
                 clusterNames.put(actualPort, contentSplit[1]);
-                writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + clusterNames.size());
+                int participantWriteIndex = Integer.parseInt(contentSplit[2]);
+                String participantLine = contentSplit[3].trim();
 
+                String lineWithIndex = node.lookForIndexInFile(participantWriteIndex);
+                if (lineWithIndex != null) lineWithIndex = lineWithIndex.trim();
+                else System.out.println("###############LINEWITHINDEX IS NULL############");
+                System.out.println(node.name + ": lineWithIndex:" + lineWithIndex);
+                System.out.println(node.name + ": participantLine:" + participantLine);
+
+                boolean matches = participantLine.equals(lineWithIndex);
+                if (participantWriteIndex == -1 && node.getCurrentWriteIndex() == -1) matches = true;
+
+                if (matches) {
+                    System.out.println(node.name + ": The participants messages seem to be good");
+                    writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + StandardMessages.MESSAGE_BASE_GOOD);
+                } else {
+                    System.out.println(node.name + ": The participants messages are not good");
+
+                    int fileSize = -1;
+                    try {
+                        File originalFile = new File(node.name + ".txt");
+                        System.out.println(originalFile.toPath());
+                        if (originalFile.exists()) {
+
+
+                            File tempFile = new File(node.name + contentSplit[1] + ".txt");
+                            // tempFile.delete();
+                            System.out.println(tempFile.toPath());
+
+                            Path hi = Files.copy(originalFile.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println(hi);
+
+                            tempFiles.put(actualPort, tempFile);
+                            fileSize = (int)tempFile.length();
+                        } else fileSize = 0;
+                        System.out.println(node.name + ": My file size:" + fileSize);
+
+                        writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + StandardMessages.MESSAGE_BASE_BAD + " " + fileSize); // -1 = error, 0 = no file, else initiateSendMessage
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        System.out.println(node.name + ": Me dead lol, no message base at all");
+                        listenerDied(actualPort);
+                    } finally {
+                        // if (tempFile != null) tempFile.delete();
+                    }
+                }
+
+                // welcomeNewNodeToCluster(); // Not yet, wait for confirmation
+            } else if (message.startsWith(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE.toString())) {
+                System.out.println(node.name + ": got a response to the message base feedback");
+
+                String content = message.withoutStandardPart(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE);
+                boolean needsFileTransmission = content.startsWith(StandardMessages.MESSAGE_BASE_READY_FOR_TRANSMISSION.toString());
+                if (!needsFileTransmission) {
+                    // System.out.println(node.name + ": messageIndex:" + message.getIndex() + ", sender: " + message.getSender());
+                    clusterListeners.get(message.getSender()).informationExchanged = true;
+                } else {
+                    // Initialize file transfer
+                    clusterWriters.get(message.getSender()).sendMessageFile();
+                    clusterListeners.get(message.getSender()).informationExchanged = true;
+                }
                 welcomeNewNodeToCluster();
             }
         } else {
@@ -248,4 +317,8 @@ public class Coordinator extends Role implements Runnable {
     public Status getStatus() {
         return status;
     }
+
+    public File getTempFileOf(int port) { System.out.println(node.name + ": Requested tempFile of: " + port); return tempFiles.get(port); }
+    public void removeTempFileOf(int port) { tempFiles.remove(port); }
+
 }

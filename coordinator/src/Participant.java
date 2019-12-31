@@ -54,11 +54,41 @@ public class Participant extends Role {
         if (duringInformationExchange) {
             int localSenderPort = message.getSender();
             if (message.startsWith(StandardMessages.INTRODUCTION_COORDINATOR.toString())) {
-                // String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_COORDINATOR);
+                String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_COORDINATOR);
+                if (content.startsWith(StandardMessages.MESSAGE_BASE_GOOD.toString())) {
+                    System.out.println(node.name + ": My message base seems to be good, we gucci");
+                    // we good, information is exchanged
+                    coordTcpListener.informationExchanged = true;
+                    coordTcpWriter.write(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE + " " + StandardMessages.MESSAGE_BASE_DONE);
+                } else {
+                    // initialize file transfer
+                    int fileSize = Integer.parseInt(content.substring(StandardMessages.MESSAGE_BASE_BAD.length() + 1));
+                    if (fileSize == -1) {
+                        // I don't think this will happen, since pipe will break. but suicide just to be sure
+                        System.out.println(node.name + ": Seems like the coordinator had problems");
+                        close();
+                    } else if (fileSize == 0) {
+                        // Just delete file -> sync with coordinator
+                        System.out.println(node.name + ": Coordinator told me to delete my messages");
+                        node.deleteMessagesFile();
+                        coordTcpWriter.write(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE + " " + StandardMessages.MESSAGE_BASE_DONE);
+                    } else {
+                        // prepare for file transfer
+                        System.out.println(node.name + ": Preparing for file transfer, my messages weren't good");
+
+                        node.deleteMessagesFile();
+                        coordTcpListener.FILE_SIZE = fileSize;
+                        coordTcpListener.receivingFile = true;
+                        coordTcpWriter.write(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE + " " + StandardMessages.MESSAGE_BASE_READY_FOR_TRANSMISSION);
+                    }
+                    coordTcpListener.informationExchanged = true;
+
+                }
                 // int clusterSize = Integer.parseInt(content);
-                System.out.println(node.name + ": got introduction back from coordinator, will send out queued messages now");
-                coordTcpListener.informationExchanged = true;
-                node.messageQueue.sendQueuedMessages();
+                // Check current writeIndex with own
+                // System.out.println(node.name + ": got introduction back from coordinator, will send out queued messages now");
+
+                // node.messageQueue.sendQueuedMessages();
 
                 /*
                 coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
@@ -71,6 +101,7 @@ public class Participant extends Role {
                 // Message format: CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
                 String[] messageSplit = message.split(" ");
                 int coordinatorsIndex = Integer.parseInt(messageSplit[1]);
+                node.messageQueue.requestMissingMessages(coordinatorsIndex);
                 // TODO: check coordinatorsIndex ?<=>? myIndex
                 clusterNames.clear();
 
@@ -81,7 +112,7 @@ public class Participant extends Role {
                         String name = messageSplit[i];
                         if(port != node.getPort()) {
                             addToCluster(port, name);
-                            System.out.println("Added " + name + " to cluster");
+                            System.out.println(node.name + ": Added " + name + " to cluster");
                         }
                     }
                 }

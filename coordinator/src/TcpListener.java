@@ -3,13 +3,16 @@ import java.net.Socket;
 
 public class TcpListener extends Thread {
 
-    private BufferedReader in;
+    public boolean receivingFile = false;
+    protected BufferedReader in;
     private Role role;
     private Node node;
     private int port;
     private Socket socket;
     private volatile boolean listening = true;
     volatile boolean informationExchanged = false;
+
+    public int FILE_SIZE;
 
     public TcpListener(Role role, Node node, Socket socket, int port) throws IOException {
         this.role = role;
@@ -52,7 +55,7 @@ public class TcpListener extends Thread {
 
                 if (nextLine != null) {
                     System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
-                    Message message = new Message(socket.getPort(), nextLine);
+                    Message message = new Message(port, nextLine);
                     role.actionOnMessage(message, true);
                 } else {
                     // listener died
@@ -65,7 +68,64 @@ public class TcpListener extends Thread {
             }
         }
 
+        if (receivingFile) {
+            System.out.println(node.name + ": ReceivingFile is listening, filesize: " + FILE_SIZE);
+
+            int bytesRead;
+            int current = 0;
+
+            try {
+
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+                FileOutputStream fos = new FileOutputStream(node.name + ".txt");
+                byte[] buffer = new byte[4096];
+
+                int read = 0;
+                int totalRead = 0;
+                int remaining = FILE_SIZE;
+                while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
+                    totalRead += read;
+                    remaining -= read;
+                    System.out.println("read " + totalRead + " bytes.");
+                    fos.write(buffer, 0, read);
+                }
+
+                fos.flush();
+                fos.close();
+                dis.close();
+
+
+                /*
+                byte [] mybytearray  = new byte [FILE_SIZE];
+
+                fileInputStream = socket.getInputStream();
+                fos = new FileOutputStream(node.name + ".txt");
+                bos = new BufferedOutputStream(fos);
+
+                bytesRead = fileInputStream.read(mybytearray, 0, mybytearray.length);
+                current = bytesRead;
+
+                do {
+                    System.out.println(node.name + ": hi");
+                    bytesRead = fileInputStream.read(mybytearray, current, (mybytearray.length-current));
+                    if(bytesRead >= 0) current += bytesRead;
+                } while(bytesRead > -1);
+
+                bos.write(mybytearray, 0 , current);
+                bos.flush();
+                 */
+                System.out.println("File downloaded (" + current + " bytes read)");
+                node.initializeWriteIndex();
+            } catch (IOException e) {
+                // e.printStackTrace();
+                System.out.println(node.name + ": TcpListener Exception during file base exchange");
+                role.listenerDied(port);
+            }
+
+        }
+
         System.out.println(node.name + ": information was exchanged, I'll listen the right way now");
+        node.messageQueue.sendQueuedMessages();
 
         while (listening) {
             try {

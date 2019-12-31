@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 
 public class TcpWriter extends Thread {
+    private int id;
     private Socket socket;
     private Node node;
     private Role role;
@@ -18,8 +19,9 @@ public class TcpWriter extends Thread {
         this.role = role;
     }
 
-    public TcpWriter(Socket socket, Node node) {
+    public TcpWriter(Socket socket, Role role, Node node) {
         this.socket = socket;
+        this.role = role;
         this.node = node;
         // System.out.println("\nOh, there is a new connection: " + socket);
         setupOutput();
@@ -57,6 +59,46 @@ public class TcpWriter extends Thread {
         System.out.println("Written: " + message);
     }
 
+    public void sendMessageFile() {
+        FileInputStream fileInputStream;
+        BufferedInputStream bis = null;
+        OutputStream fileOutputStream = null;
+        File tempFile = null;
+        try {
+            tempFile = ((Coordinator) role).getTempFileOf(id);
+            System.out.println(tempFile);
+
+            if (tempFile.exists()) {
+
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                FileInputStream fis = new FileInputStream(tempFile);
+                byte[] buffer = new byte[4096];
+
+                int read;
+                while ((read=fis.read(buffer)) > 0) {
+                    dos.write(buffer,0,read);
+                }
+                fis.close();
+                dos.flush();
+                dos.close();
+
+            } else System.out.println(node.name + ": No file, so not sending any file");
+
+            System.out.println("Done.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (tempFile != null) tempFile.delete();
+                if (bis != null) bis.close();
+                if (fileOutputStream != null) fileOutputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
     public void close() {
         try {
             if (out != null) out.close();
@@ -72,4 +114,7 @@ public class TcpWriter extends Thread {
         return socket;
     }
 
+    public void setId(int id) {
+        this.id = id;
+    }
 }

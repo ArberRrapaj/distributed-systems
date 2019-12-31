@@ -21,6 +21,7 @@ public class MessageQueue {
 
     public void sendQueuedMessages() {
         for (String message: toSend) {
+            System.out.println(node.name + ": calling sendqueuedmessages");
             node.role.sendMessage(message);
         }
     }
@@ -55,12 +56,25 @@ public class MessageQueue {
         }
     }
 
-    private void requestMessage(int i) {
+    public void requestMessage(int i) {
+        System.out.println(node.name + ": requesting message: " + i);
+
         try {
             node.multicaster.send(StandardMessages.REQUEST_MESSAGE.toString() + " " + i);
         } catch (IOException e) {
             e.printStackTrace();
             // TODO: Retry?
+        }
+    }
+
+    public void requestMissingMessages(int indexFromCoordinator) {
+        System.out.println(node.name + ": looking for missing messages to request wi:" + node.getCurrentWriteIndex() + "; ci:" + indexFromCoordinator);
+
+        int currentWriteIndex = node.getCurrentWriteIndex();
+        if (indexFromCoordinator > currentWriteIndex) {
+            for (int i = currentWriteIndex + 1; i < indexFromCoordinator + 1; i++) {
+                if (toWrite.get(i) == null) requestMessage(i);
+            }
         }
     }
 
@@ -97,7 +111,7 @@ public class MessageQueue {
     }
 
     public String getMessage(int index) {
-        if (index >= node.getCurrentWriteIndex()) return null;
+        if (index > node.getCurrentWriteIndex()) return null;
         if (messages.size() > 0) {
             Message messageToReturn = messages.get(index);
             if (messageToReturn == null) return null;
