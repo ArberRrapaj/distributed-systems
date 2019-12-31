@@ -74,23 +74,24 @@ class NodeTest {
     private static void setupThreeNodeCluster() throws IOException {
         Node node = createAndStartNode(getRandomPort(), "Alice");
         assertTrue(node.getClusterNames().isEmpty());
+        assertTrue(node.getRole().contains("Coordinator"));
         coordinator = node;
 
         Node node2 = createAndStartNode(getRandomPort(), "Bob");
         waitASec();
-        assertFalse(node2.getClusterNames().isEmpty());
         assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node.getClusterNames().values().contains("Bob"));
         assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node2.getClusterNames().values().contains("Alice"));
+        assertTrue(node2.getRole().contains("Participator"));
 
         Node node3 = createAndStartNode(getRandomPort(), "Charlie");
         waitASec();
-        assertNotNull(node3.getClusterNames());
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
         assertTrue(node3.getClusterNames().values().contains("Bob"));
+        assertTrue(node2.getRole().contains("Participator"));
         System.out.println("\n\n\nThree node cluster - setup complete");
     }
   
@@ -240,10 +241,10 @@ class NodeTest {
         try {
             sleep(12000);
         } catch (InterruptedException e) { System.exit(1); }
+        assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
         assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
         assertTrue(nodes.stream().anyMatch(
                 x -> x.getRole().contains("Coordinator")));
-        assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
     }
   
     private static void waitASec() {

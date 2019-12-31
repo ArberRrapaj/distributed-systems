@@ -29,13 +29,10 @@ public class Node extends Elector {
     int writeAheadIndex = -1;
     MessageQueue messageQueue = new MessageQueue(this);
     // Ports:
-    private int coordinator;
     private int port;
-    // private volatile int writeIndex; TODO: merge relic
     private int latestClusterSize;
     // Connections:
     private ServerSocket newConnectionsSocket;
-    // private NodeWriter writer;
     public Multicaster multicaster;
     // Status:
     private boolean running = true;
@@ -160,7 +157,6 @@ public class Node extends Elector {
     protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
         Participant part = new Participant(this, coordinator, coordinatorName);
         role = part;
-        new Thread(part, "Participant-" + name).start();
     }
 
     protected void becomeCoordinator() throws IOException {
