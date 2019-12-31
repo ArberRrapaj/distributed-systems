@@ -1,11 +1,5 @@
-import java.awt.*;
-import java.awt.event.KeyEvent;
 import java.io.IOException;
-import com.oracle.tools.packager.IOUtils;
-
-import java.util.NoSuchElementException;
 import java.util.Scanner;
-import java.util.concurrent.*;
 
 public class NodeWriter extends Thread {
 

@@ -1,9 +1,8 @@
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.Socket;
 import java.util.HashMap;
 
-public class Participant extends Role implements Runnable {
+public class Participant extends Role {
 
     private final Status status = Status.PARTICIPANT;
 
@@ -22,28 +21,22 @@ public class Participant extends Role implements Runnable {
         joinCluster(coordinator, coordinatorName);
     }
 
-    public void run() {
-        listenerThread = new Thread(coordTcpListener, "coordTcpListener-" + node.getName());
-        listenerThread.start();
-
-        System.out.println(node.name + ": I wanna introduce myself to the coordinator");
-        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name + "$" + node.getCurrentWriteIndex() + "$" + node.lookForIndexInFile(node.getCurrentWriteIndex()));
-    }
-
     private void joinCluster(int coordinator, String coordinatorName) throws IOException {
         clusterNames = new HashMap<>();
         // addToCluster(coordinator, coordinatorName);
 
         System.out.println("Port " + node.getPort() + "(" + node.name + ") joining cluster of: " + coordinator + "(" + coordinatorName + ")");
         establishCoordConnection(coordinator);
-
-        // TODO: handleMessagesFile()
     }
 
 
     private void establishCoordConnection(int coordinator) throws IOException {
-        coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket(), coordinator);
+        coordTcpWriter = new TcpWriter(this, node);
+        Socket socket = coordTcpWriter.connect(coordinator);
+        coordTcpListener = new TcpListener(this, node, socket, node.getPort());
+        listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
+        listenerThread.start();
+        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
     }
 
     public void sendMessage(String message) {
@@ -185,6 +178,6 @@ public class Participant extends Role implements Runnable {
     }
 
     private void initiateReElection() {
-        new Thread(() -> node.reElection(), "reElection-pc").start();
+        new Thread(() -> node.reElection(), "reElection-pc-"+node.getName()).start();
     }
 }

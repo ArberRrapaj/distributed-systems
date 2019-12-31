@@ -7,16 +7,16 @@ public abstract class Role {
     protected Node node;
     protected NodeWriter nodeWriter;
     protected Thread nodeWriterThread;
+    protected Map<Integer, String> clusterNames;
 
     public int getPort() {
         return node.getPort();
     }
-
+    public abstract Status getStatus();
     public String getName()  {
         return node.getName();
     }
 
-    protected Map<Integer, String> clusterNames;
     public Map<Integer, String> getClusterNames() {
         return clusterNames;
     }
@@ -43,10 +43,6 @@ public abstract class Role {
 
     public abstract boolean informationExchanged();
 
-    protected int getWriteIndex() {
-        return node.getWriteIndex();
-    }
-;
 
     public int printCurrentlyConnected() {
         int connectedUsers = clusterNames.keySet().size();
@@ -78,8 +74,6 @@ public abstract class Role {
         }
         System.out.println(node.name + ": Role closed");
     }
-
-    public abstract Status getStatus();
 
     public void addToCluster(Integer port, String name) {
         String existentVal = clusterNames.getOrDefault(port, null);

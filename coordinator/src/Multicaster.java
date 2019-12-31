@@ -9,12 +9,14 @@ public class Multicaster extends Thread {
     private int mcPort;
     private InetAddress mcGroup;
     private MulticastSocket mcSocket;
+    private MessageQueue messageQueue;
 
 
-    public Multicaster(Node node, String ip, int port, int timeout) throws ConnectException {
+    public Multicaster(Node node, MessageQueue messageQueue, String ip, int port, int timeout) throws ConnectException {
         setName("Multicaster-"+node.getName());
         // join Multicast group
         this.node = node;
+        this.messageQueue = messageQueue;
         mcPort = port;
         try {
             mcGroup = InetAddress.getByName(ip);
@@ -50,37 +52,41 @@ public class Multicaster extends Thread {
             }
             try {
                Message received = receive();
-               if (received == null); // System.out.println("I've received my own message from multicast");
-               else if (!received.getText().isEmpty()) {
-                   if (received.startsWith(Status.REQUEST.toString())) {
+               if (received != null && !received.getText().isEmpty()) {
+                   if (received.startsWith(Status.SEARCHING.toString())) {
                        node.answerSearchRequest(received);
                    } else if (received.startsWith(Status.DEAD.toString())) {
                        node.handleDeathOf(received.getSender());
                    } else if (received.startsWith(Status.ELECTION.toString())) {
-                       new Thread(() -> node.reElection(), "reElection-mc").start();
-                       node.documentCandidate(received);
+                       if(node.getStatus().isInElection()) {
+                           node.documentCandidate(received);
+                       } else {
+                           new Thread(() -> {
+                               node.reElection();
+                               node.documentCandidate(received);
+                           }, "reElection-mc-"+getName()).start();
+                       }
                    } else if (received.startsWith(Status.ELECTED.toString())) {
                        node.documentElected(received);
                    } else if(received.getIndex() != null) {
-                       node.messageQueue.handleNewMessage(received);
+                       messageQueue.handleNewMessage(received);
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE.toString())) {
-                       System.out.println(node.name + ": Received a message request: " + received.toString());
+                       System.out.println(node.getName() + ": Received a message request: " + received.toString());
                        // Get message with that index
                        int index = Integer.parseInt(received.withoutStandardPart(StandardMessages.REQUEST_MESSAGE));
                        String requestedMessage = node.messageQueue.getMessage(index);
                        System.out.println(node.name + ": I would send this to you: " + requestedMessage);
                        if (requestedMessage != null) send(requestedMessage);
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE_ANSWER.toString())) {
-                      node.messageQueue.receivedRequestAnswer(received.sanitizeMessage(StandardMessages.REQUEST_MESSAGE_ANSWER));
+                      messageQueue.receivedRequestAnswer(received.sanitizeMessage(StandardMessages.REQUEST_MESSAGE_ANSWER));
                    } else {
-                       // ignore.
-                       // System.err.println("Received unexpected Multicast message: " + received);
+                       //System.err.println("Received unattended Multicast message: " + received);
                    }
                }
            } catch(SocketTimeoutException e) {
                // nothing received, repeat
            } catch(IOException e) {
-               System.out.println(node.name + ": Socket closed");
+               System.out.println(node.getName() + ": Socket closed");
                // e.printStackTrace();
                node.suicide();
            }
@@ -106,7 +112,6 @@ public class Multicaster extends Thread {
 
         int sender = Integer.parseInt(receivedSplit[0]);
         if (sender == node.getPort()) {
-            // TODO: handle differently
             return null; // ignore messages sent by yourself
         }
         String content = receivedSplit[1];
@@ -133,7 +138,7 @@ public class Multicaster extends Thread {
         } catch (IOException e) {
             // failed to leave. ignore.
         }
-        System.out.println(node.name + ": Multicaster closed");
+        System.out.println(node.getName() + ": Multicaster closed");
     }
 }
 

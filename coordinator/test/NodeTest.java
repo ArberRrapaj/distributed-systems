@@ -1,4 +1,3 @@
-import com.sun.tools.internal.ws.wsdl.document.jaxws.Exception;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
@@ -31,71 +30,83 @@ class NodeTest {
         rand = new Random();
 
         availablePorts = new HashSet<>();
-        for(int port = LOWER_PORT; port<=UPPER_PORT; port++) {
+        for (int port = LOWER_PORT; port <= UPPER_PORT; port++) {
             availablePorts.add(port);
         }
     }
-  
+
     @org.junit.jupiter.api.AfterEach
     void tearDown() {
         /*
-        List<Node> delete = new ArrayList<Node>();
-        for(Node node : nodes){
-            node.close();
-            delete.add(node);
-        }
-        nodes.removeAll(delete);
-
+         * List<Node> delete = new ArrayList<Node>(); for(Node node : nodes){
+         * node.close(); delete.add(node); } nodes.removeAll(delete);
          */
     }
 
-    /*
-            Tests
+    /**
+     * Tests
      */
+
+    // @Test
+    void startingTwoNodesSimultaneouslyYieldsACoordinator() {
+
+        try {
+            Node node1 = new Node(5001, "Alice");
+            Node node2 = new Node(5002, "Bert");
+            node1.getSearchClusterThread().start();
+            node2.getSearchClusterThread().start();
+
+            chillout(30000);
+            assertTrue(node1.getClusterNames().values().stream().anyMatch(x -> x.equals("Bert")));
+            assertTrue(node2.getClusterNames().values().stream().anyMatch(x -> x.equals("Alice")));
+            assertTrue(node1.getRole().contains("Coordinator") || node2.getRole().contains("Coordinator"));
+        } catch (ConnectException e) {
+            fail(e.getMessage());
+        }
+    }
 
     // @Test
     void basicConversation() throws IOException {
         deleteMessagesFile("Abigail");
         deleteMessagesFile("Bertram");
 
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
 
         node1.messageQueue.sendMessage("Nachricht #1 von Abigail(Koordinator)");
-        node2.messageQueue.sendMessage("Nachricht #2 von Betram");
+        node2.messageQueue.sendMessage("Nachricht #2 von Bertram");
         node2.messageQueue.sendMessage("Nachricht #3 von Bertram");
 
         assertEquals(node1.getFileHash(), node2.getFileHash());
         assertEquals(node1.lookForIndexInFile(0), node2.lookForIndexInFile(0));
     } // Passes
-  
+
     // @Test
     void initializeRightWriteIndex() throws IOException {
         deleteMessagesFile("nodeWithEntries");
-        writeToFile("nodeWithEntries", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+        writeToFile("nodeWithEntries",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
 
-        Node nodeWithEntries = createAndStartNode(getRandomPort(), "nodeWithEntries");
+        Node nodeWithEntries = createStartAndWaitForNode(getRandomPort(), "nodeWithEntries");
         assertEquals(2, nodeWithEntries.initializeWriteIndex());
-
 
         deleteMessagesFile("nodeWithoutEntries");
         writeToFile("nodeWithoutEntries", "");
 
-        Node nodeWithoutEntries = createAndStartNode(getRandomPort(), "nodeWithoutEntries");
+        Node nodeWithoutEntries = createStartAndWaitForNode(getRandomPort(), "nodeWithoutEntries");
         assertEquals(-1, nodeWithoutEntries.initializeWriteIndex());
 
-
         deleteMessagesFile("nodeWithoutFile");
-        Node nodeWithoutFile = createAndStartNode(getRandomPort(), "nodeWithoutFile");
+        Node nodeWithoutFile = createStartAndWaitForNode(getRandomPort(), "nodeWithoutFile");
         assertEquals(-1, nodeWithoutFile.initializeWriteIndex());
     }
-  
+
     // @Test
     void closeNode() throws ConnectException {
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
         node1.role.printCurrentlyConnected();
 
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         node1.role.printCurrentlyConnected();
         chillout(500);
 
@@ -111,16 +122,16 @@ class NodeTest {
         assertEquals(0, coordinator.clusterWriters.size());
         nodes.remove(node2);
     }
-  
+
     // @Test
     void recoverFromDisconnect() throws ConnectException {
         deleteMessagesFile("Abigail");
         deleteMessagesFile("Bertram");
         deleteMessagesFile("Camille");
 
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
-        Node node3 = createAndStartNode(getRandomPort(), "Camille");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
+        Node node3 = createStartAndWaitForNode(getRandomPort(), "Camille");
 
         node1.messageQueue.sendMessage("Nachricht #1 von Koordinator");
         node2.messageQueue.sendMessage("Nachricht #2 von Bertram");
@@ -136,7 +147,7 @@ class NodeTest {
         assertEquals(node3.getFileHash(), node1.getFileHash());
         assertNotEquals(node3.getFileHash(), node2.getFileHash());
 
-        node2 = createAndStartNode(getRandomPort(), "Bertram");
+        node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         assertEquals(1, node2.getCurrentWriteIndex());
 
         node2.messageQueue.sendMessage("Nachricht #5 von Bertram, nach Disconnect");
@@ -149,34 +160,32 @@ class NodeTest {
 
     // @Test
     void correctClusterSizeCommunication() throws ConnectException {
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
         chillout(200);
         assertEquals(0, node1.getLatestClusterSize());
 
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         chillout(200);
         assertEquals(1, node1.getLatestClusterSize());
         assertEquals(1, node2.getLatestClusterSize());
 
-        Node node3 = createAndStartNode(getRandomPort(), "Camille");
+        Node node3 = createStartAndWaitForNode(getRandomPort(), "Camille");
         chillout(200);
         assertEquals(2, node1.getLatestClusterSize());
         assertEquals(2, node2.getLatestClusterSize());
         assertEquals(2, node3.getLatestClusterSize());
 
         /*
-        node1.close();
-        chillout(1000);
-        assertEquals(1, node2.getLatestClusterSize());
-        assertEquals(1, node3.getLatestClusterSize());
-        */
+         * node1.close(); chillout(1000); assertEquals(1, node2.getLatestClusterSize());
+         * assertEquals(1, node3.getLatestClusterSize());
+         */
 
         node2.close();
         chillout(200);
         assertEquals(1, node1.getLatestClusterSize());
         assertEquals(1, node3.getLatestClusterSize());
 
-        node2 = createAndStartNode(getRandomPort(), "Bertram");
+        node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         chillout(200);
         assertEquals(2, node1.getLatestClusterSize());
         assertEquals(2, node2.getLatestClusterSize());
@@ -186,15 +195,16 @@ class NodeTest {
     // @Test
     void initializeMessageBaseRight_rightButMissingMessages() throws IOException {
         deleteMessagesFile("Abigail");
-        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+        writeToFile("Abigail",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
 
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
         assertEquals(2, node1.getCurrentWriteIndex());
 
-
         deleteMessagesFile("Betram");
-        writeToFile("Bertram", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant");
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        writeToFile("Bertram",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         assertEquals(1, node2.getCurrentWriteIndex());
 
         chillout(2000);
@@ -204,16 +214,17 @@ class NodeTest {
     // @Test
     void initializeMessageBaseRight_faultyMessages() throws IOException {
         deleteMessagesFile("Abigail");
-        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+        writeToFile("Abigail",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
 
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
         assertEquals(2, node1.getCurrentWriteIndex());
 
-
         deleteMessagesFile("Bertram");
-        writeToFile("Bertram", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participan");
+        writeToFile("Bertram",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participan");
 
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         chillout(1000);
         assertEquals(2, node2.getCurrentWriteIndex());
     }
@@ -221,18 +232,18 @@ class NodeTest {
     // @Test
     void initializeMessageBaseRight_NoMessageFile() throws IOException {
         deleteMessagesFile("Abigail");
-        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+        writeToFile("Abigail",
+                "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
 
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        Node node1 = createStartAndWaitForNode(getRandomPort(), "Abigail");
         assertEquals(2, node1.getCurrentWriteIndex());
 
-
         deleteMessagesFile("Bertram");
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bertram");
         chillout(1000);
         assertEquals(2, node2.getCurrentWriteIndex());
     }
-  
+
     // @Test
     void killingCoordinatorTriggersReElection() throws IOException {
         try {
@@ -245,21 +256,22 @@ class NodeTest {
         nodes.remove(coordinator);
         try {
             sleep(12000);
-        } catch (InterruptedException e) { System.exit(1); }
-        assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
-        assertTrue(nodes.stream().anyMatch(
-                x -> x.getRole().contains("Coordinator")));
+        } catch (InterruptedException e) {
+            System.exit(1);
+        }
         assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
+        assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
+        assertTrue(nodes.stream().anyMatch(x -> x.getRole().contains("Coordinator")));
     }
 
 
+    
     /***
-     *  Helper methods
+     * Helper methods
      */
 
-
-    private static Node createAndStartNode(int port, String name) throws ConnectException {
-        Node node = new Node(port,name);
+    private static Node createStartAndWaitForNode(int port, String name) throws ConnectException {
+        Node node = new Node(port, name);
 
         Thread searchClusterTh = node.getSearchClusterThread();
         searchClusterTh.start();
@@ -273,32 +285,35 @@ class NodeTest {
     }
 
     private static void setupThreeNodeCluster() throws IOException {
-        Node node = createAndStartNode(getRandomPort(), "Alice");
+        Node node = createStartAndWaitForNode(getRandomPort(), "Alice");
         assertTrue(node.getClusterNames().isEmpty());
+        assertTrue(node.getRole().contains("Coordinator"));
         coordinator = node;
 
-        Node node2 = createAndStartNode(getRandomPort(), "Bob");
+        Node node2 = createStartAndWaitForNode(getRandomPort(), "Bob");
         waitASec();
-        assertFalse(node2.getClusterNames().isEmpty());
         assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node.getClusterNames().values().contains("Bob"));
         assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node2.getClusterNames().values().contains("Alice"));
+        assertTrue(node2.getRole().contains("Participant"));
 
-        Node node3 = createAndStartNode(getRandomPort(), "Charlie");
+        Node node3 = createStartAndWaitForNode(getRandomPort(), "Charlie");
         waitASec();
-        assertNotNull(node3.getClusterNames());
         assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
         assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
         assertTrue(node3.getClusterNames().values().contains("Alice"));
         assertTrue(node3.getClusterNames().values().contains("Bob"));
+        assertTrue(node2.getRole().contains("Participant"));
         System.out.println("\n\n\nThree node cluster - setup complete");
     }
-  
+
     private static void waitASec() {
         try {
             sleep(1000);
-        } catch (InterruptedException e) { System.exit(1); }
+        } catch (InterruptedException e) {
+            System.exit(1);
+        }
     }
 
     private static int getRandomPort() {
@@ -315,11 +330,12 @@ class NodeTest {
     public void writeToFile(String name, String message) {
         String line = message + "\r\n";
 
-        File file = new File (name + ".txt");
+        File file = new File(name + ".txt");
         FileWriter fw = null;
 
         try {
-            if (!file.exists()) file.createNewFile();
+            if (!file.exists())
+                file.createNewFile();
 
             fw = new FileWriter(file.getAbsoluteFile(), false); // new file
             fw.write(line);
@@ -348,7 +364,10 @@ class NodeTest {
     }
 
     private void chillout(int milliseconds) {
-        try { Thread.sleep(milliseconds); }
-        catch (InterruptedException e) { e.printStackTrace(); }
+        try {
+            Thread.sleep(milliseconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
