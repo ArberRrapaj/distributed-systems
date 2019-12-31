@@ -53,7 +53,7 @@ public class Multicaster extends Thread {
             try {
                Message received = receive();
                if (received != null && !received.getText().isEmpty()) {
-                   if (received.startsWith(Status.REQUEST.toString())) {
+                   if (received.startsWith(Status.SEARCHING.toString())) {
                        node.answerSearchRequest(received);
                    } else if (received.startsWith(Status.DEAD.toString())) {
                        node.handleDeathOf(received.getSender());
@@ -80,7 +80,7 @@ public class Multicaster extends Thread {
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE_ANSWER.toString())) {
                       messageQueue.receivedRequestAnswer(received.sanitizeMessage(StandardMessages.REQUEST_MESSAGE_ANSWER));
                    } else {
-                       System.err.println("Received unattended Multicast message: " + received);
+                       //System.err.println("Received unattended Multicast message: " + received);
                    }
                }
            } catch(SocketTimeoutException e) {

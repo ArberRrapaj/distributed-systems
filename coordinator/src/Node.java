@@ -1,3 +1,5 @@
+import com.sun.corba.se.spi.activation.Server;
+
 import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.net.*;
@@ -11,12 +13,10 @@ import static java.lang.Thread.sleep;
 public class Node extends Elector {
 
     // CONFIGURATION
-    private static String IP = "localhost";
-    private static String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*, else 230.*
-    private static int MULTICAST_PORT = 4321;
-    private static final int LOWER_PORT = 5050;
-    private static final int UPPER_PORT = 5100;
-    private static final int MC_TIMEOUT = 1000;
+    private String IP = "localhost";
+    private String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*, else 230.*
+    private int MULTICAST_PORT = 4321;
+    private final int MC_TIMEOUT = 1000;
 
     // Communication
     public Role role;
@@ -28,35 +28,48 @@ public class Node extends Elector {
     private int latestClusterSize;
     public String name;
     private Thread coordinatorThread;
+    private int backoff = 0;
 
     public static void main(String[] args) {
-        // Choose a random port in range of LOWER_PORT - UPPER_PORT
-        Node node = null;
-        boolean foundPort = false;
-        while(!foundPort) {
-            int port = new Random().nextInt(UPPER_PORT - LOWER_PORT) + LOWER_PORT;
+        System.out.println("Welcome to P2P-Chat.");
+        String username;
+        if(args.length > 0) {
+            // Format of startup: java Node <username>
+            username = args[0];
+        } else {
+            System.out.print("Please provide a username: ");
+            Scanner inputScanner = new Scanner(System.in); // Create a Scanner object
+            username = inputScanner.nextLine();
+        }
+
+        while(true) {
+            int lowerPort = 5000;
+            int upperPort = 0xFFFF;
+            // Choose a random port in range of lowerPort - upperPort
+            int port = new Random().nextInt(upperPort - lowerPort) + lowerPort;
 
             // Create new Node with that port
             try {
-                node = new Node(port, "Bertram");
-                /*
+                Node node = new Node(port, username);
                 Thread searchClusterTh = node.getSearchClusterThread();
                 searchClusterTh.start();
                 searchClusterTh.join();
-                */
             } catch(ConnectException e) {
                 e.printStackTrace();
                 continue;
+            } catch (InterruptedException e) {
+                System.exit(1);
             }
 
-            foundPort = true;
+            break;
         }
-
-        // TODO: non-static getSearchClusterThread().start();
     }
 
     public Node(int port, String name) throws ConnectException {
         System.setProperty("java.net.preferIPv4Stack", "true");
+        // TODO: load config .env
+
+        checkPortAvailability(port);
 
         System.out.println("\nStarted Node with name: " + name);
         this.name = name;
@@ -66,6 +79,21 @@ public class Node extends Elector {
         multicaster = new Multicaster(this, messageQueue, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
     }
 
+    private void checkPortAvailability(int port) throws ConnectException {
+        ServerSocket serverSocket;
+        try {
+            serverSocket = new ServerSocket(port, 0, InetAddress.getByName(IP));
+        } catch (IOException e) {
+            throw new ConnectException(e.getMessage());
+        }
+
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            // ignore.
+        }
+    }
+
 
     public Thread getSearchClusterThread() {
 
@@ -73,18 +101,20 @@ public class Node extends Elector {
         advertiseSearch();
         return new Thread(() -> {
             try {
-                sleep(3000);
+                sleep(1000);
+                Thread evalTh = evaluateSearchAnswers();
+                evalTh.start();
+                evalTh.join();
+                //multicaster.start();
             } catch(InterruptedException e) {
                 suicide();
             }
-            evaluateSearchAnswers();
-            multicaster.start();
         }, "evaluateSearch");
     }
 
     private void advertiseSearch() {
         try {
-            multicaster.send(Status.REQUEST.toString() + " " + name);
+            multicaster.send(Status.SEARCHING.toString() + " " + name);
         } catch (IOException e) {
             System.err.println("Failed to send CLUSTER_SEARCH");
             e.printStackTrace();
@@ -92,10 +122,10 @@ public class Node extends Elector {
         }
     }
 
-    private void evaluateSearchAnswers() {
+    private Thread evaluateSearchAnswers() {
 
         for (int trials = 0; trials < 500; trials++) {
-            Message received = null; 
+            Message received = null;
             try {
                 received = multicaster.receive();
             } catch (SocketTimeoutException e) {
@@ -104,23 +134,24 @@ public class Node extends Elector {
                 suicide();
             }
             
-            if(received == null || received.getText().isEmpty()) continue;
+            if(received == null || received.getText().isEmpty()) {
+                continue;
+            }
                 
-            if (received.getText().startsWith(Status.COORDINATOR.toString())) {
+            if (received.startsWith(Status.COORDINATOR.toString())) {
                 int coordinator = received.getSender();
                 String coordinatorName = received.getText().split(" ")[2];
                 try {
                     becomeParticipant(coordinator, coordinatorName);
                 } catch (IOException e) {
-                    waitAndRedoSearch();
+                    return waitAndRedoSearch();
                 }
                 
-                return;
-            } else if (received.getText().equals(Status.SEARCHING.toString())) {
+                return new Thread();
+            } else if (received.startsWith(Status.SEARCHING.toString())) {
                 // There is another mf, who is searching atm, so we wait and try again later
                 status = Status.WAITING;
-                waitAndRedoSearch();
-                return;
+                return waitAndRedoSearch();
             }
         }
 
@@ -129,17 +160,22 @@ public class Node extends Elector {
         } catch (IOException e) {
             suicide();
         }
+
+        return new Thread();
     }
 
-    private void waitAndRedoSearch() {
-        new Thread(() -> {
-            try {
-                sleep(5000);
-            } catch (InterruptedException e) {
-                suicide();
-            }
-            getSearchClusterThread().start();
-        }, "searchCluster").start();
+    private Thread waitAndRedoSearch() {
+        try {
+            backoff++;
+            float c = Math.round(new Random().nextFloat() * backoff);
+            long k = Math.round(Math.pow(2.0, c));
+            System.out.println("k: " + k);
+            sleep(k * 2000);
+            return getSearchClusterThread();
+        } catch (InterruptedException e) {
+            suicide();
+            return new Thread();
+        }
     }
 
     protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
@@ -200,12 +236,6 @@ public class Node extends Elector {
 
     public void handleDeathOf(Integer port) {
         role.handleDeathOf(port);
-    }
-
-
-    public int getWriteIndex() {
-        System.err.println("getCurrentIndex() not implemented.");
-        return writeIndex;
     }
 
     public Status getStatus() {

@@ -1,9 +1,8 @@
 public enum Status {
     COORDINATOR("COORDINATOR ME", false, -1),
-    SEARCHING("I am searching", false, -1),
+    SEARCHING("COORDINATOR SEARCH", false, -1),
     WAITING("I am waiting", false, -1),
     PARTICIPANT("PARTICIPANT", false, -1),
-    REQUEST("COORDINATOR SEARCH", false, -1),
     DEAD("I am dead.", false, -1),
     ELECTION("ELECTION", true, 0),
     ADVERTISED("ELECTION", true, 1),

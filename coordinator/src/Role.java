@@ -42,10 +42,6 @@ public abstract class Role {
 
     public abstract boolean informationExchanged();
 
-    protected int getWriteIndex() {
-        return node.getWriteIndex();
-    }
-;
 
     public int printCurrentlyConnected() {
         int connectedUsers = clusterNames.keySet().size();

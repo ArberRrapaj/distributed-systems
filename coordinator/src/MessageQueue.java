@@ -50,7 +50,7 @@ public class MessageQueue {
         for(int key : keys) if (maxIndex < key) maxIndex = key;
 
         // TODO: Optimize, many potential redundant messages
-        for (int i = node.getWriteIndex() + 1; i <= maxIndex; i++) {
+        for (int i = node.getNextWriteIndex(); i <= maxIndex; i++) {
             if (toWrite.get(i) == null) requestMessage(i);
         }
     }
