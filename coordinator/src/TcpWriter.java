@@ -6,7 +6,6 @@ import java.net.SocketAddress;
 
 public class TcpWriter extends Thread {
     private int port;
-    private int connectionPort;
     private Socket socket;
     protected Node node;
     protected Role role;
@@ -31,10 +30,11 @@ public class TcpWriter extends Thread {
         System.out.println("\nOh, seems like I - " + node.getPort() + " wanna connect to: " + portToConnectTo);
     }
 
-    public TcpWriter(int port, Socket socket, Node node) {
+    public TcpWriter(int port, Socket socket, Role role, Node node) {
         this.port = port;
         this.socket = socket;
         this.node = node;
+        this.role = role;
         this.id = socket.getPort();
         // System.out.println("\nOh, there is a new connection: " + socket);
         setupInOutput();
@@ -50,7 +50,6 @@ public class TcpWriter extends Thread {
             throw new ConnectException("Failed to connect to: " + port + e);
         }
         // System.out.println("TCPClient connected socket: " + socket);
-        connectionPort = socket.getLocalPort();
     }
 
 
@@ -71,6 +70,58 @@ public class TcpWriter extends Thread {
         System.out.println("Written: " + message);
     }
 
+    public void sendMessageFile() {
+        FileInputStream fileInputStream;
+        BufferedInputStream bis = null;
+        OutputStream fileOutputStream = null;
+        File tempFile = null;
+        try {
+            tempFile = ((Coordinator) role).getTempFileOf(id);
+            System.out.println(tempFile);
+
+            if (tempFile.exists()) {
+
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                FileInputStream fis = new FileInputStream(tempFile);
+                byte[] buffer = new byte[4096];
+
+                int read;
+                while ((read=fis.read(buffer)) > 0) {
+                    dos.write(buffer,0,read);
+                }
+                fis.close();
+                dos.flush();
+                dos.close();
+                /*
+                // send file
+                byte [] mybytearray  = new byte [(int)tempFile.length()];
+                fileInputStream = new FileInputStream(tempFile);
+                bis = new BufferedInputStream(fileInputStream);
+                bis.read(mybytearray, 0, mybytearray.length);
+
+                fileOutputStream = socket.getOutputStream();
+                System.out.println("Sending chat-file (" + mybytearray.length + " bytes)");
+                fileOutputStream.write(mybytearray, 0, mybytearray.length);
+                fileOutputStream.flush();
+
+                 */
+            } else System.out.println(node.name + ": No file, so not sending any file");
+
+            System.out.println("Done.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (tempFile != null) tempFile.delete();
+                if (bis != null) bis.close();
+                if (fileOutputStream != null) fileOutputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
     public void close() {
         try {
             if (listener != null) listener.close();
@@ -86,6 +137,10 @@ public class TcpWriter extends Thread {
 
     public Socket getSocket() {
         return socket;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     /*
@@ -130,9 +185,7 @@ public class TcpWriter extends Thread {
         return hash;
     }
 
-    public int getPort() {
-        return port;
-    }
+
 
     public void handleMessagesFile() {
         listener.stopListening();

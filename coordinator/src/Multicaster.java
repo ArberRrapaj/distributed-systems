@@ -66,7 +66,7 @@ public class Multicaster extends Thread {
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE.toString())) {
                        System.out.println(node.name + ": Received a message request: " + received.toString());
                        // Get message with that index
-                       int index = Integer.parseInt(received.toString().substring(StandardMessages.REQUEST_MESSAGE.length() + 1));
+                       int index = Integer.parseInt(received.withoutStandardPart(StandardMessages.REQUEST_MESSAGE));
                        String requestedMessage = node.messageQueue.getMessage(index);
                        System.out.println(node.name + ": I would send this to you: " + requestedMessage);
                        if (requestedMessage != null) send(requestedMessage);

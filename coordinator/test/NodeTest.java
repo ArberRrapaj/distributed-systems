@@ -34,15 +34,6 @@ class NodeTest {
         for(int port = LOWER_PORT; port<=UPPER_PORT; port++) {
             availablePorts.add(port);
         }
-
-        /*
-        try {
-            setupThreeNodeCluster();
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail(e);
-        }
-         */
     }
   
     @org.junit.jupiter.api.AfterEach
@@ -54,46 +45,14 @@ class NodeTest {
             delete.add(node);
         }
         nodes.removeAll(delete);
-        */
+
+         */
     }
 
-    private static Node createAndStartNode(int port, String name) throws ConnectException {
-        Node node = new Node(port,name);
+    /*
+            Tests
+     */
 
-        Thread searchClusterTh = node.getSearchClusterThread();
-        searchClusterTh.start();
-        try {
-            searchClusterTh.join();
-        } catch (InterruptedException e) {
-            fail("Waiting for search cluster.");
-        }
-        nodes.add(node);
-        return node;
-    }
-
-    private static void setupThreeNodeCluster() throws IOException {
-        Node node = createAndStartNode(getRandomPort(), "Alice");
-        assertTrue(node.getClusterNames().isEmpty());
-        coordinator = node;
-
-        Node node2 = createAndStartNode(getRandomPort(), "Bob");
-        waitASec();
-        assertFalse(node2.getClusterNames().isEmpty());
-        assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
-        assertTrue(node.getClusterNames().values().contains("Bob"));
-        assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
-        assertTrue(node2.getClusterNames().values().contains("Alice"));
-
-        Node node3 = createAndStartNode(getRandomPort(), "Charlie");
-        waitASec();
-        assertNotNull(node3.getClusterNames());
-        assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
-        assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
-        assertTrue(node3.getClusterNames().values().contains("Alice"));
-        assertTrue(node3.getClusterNames().values().contains("Bob"));
-        System.out.println("\n\n\nThree node cluster - setup complete");
-    }
-  
     // @Test
     void basicConversation() throws IOException {
         deleteMessagesFile("Abigail");
@@ -108,7 +67,7 @@ class NodeTest {
 
         assertEquals(node1.getFileHash(), node2.getFileHash());
         assertEquals(node1.lookForIndexInFile(0), node2.lookForIndexInFile(0));
-    }
+    } // Passes
   
     // @Test
     void initializeRightWriteIndex() throws IOException {
@@ -150,10 +109,10 @@ class NodeTest {
         assertEquals(0, coordinator.clusterListeners.size());
         assertEquals(0, coordinator.listenerThreads.size());
         assertEquals(0, coordinator.clusterWriters.size());
+        nodes.remove(node2);
     }
   
-    //@RepeatedTest(10)
-    //@Test
+    // @Test
     void recoverFromDisconnect() throws ConnectException {
         deleteMessagesFile("Abigail");
         deleteMessagesFile("Bertram");
@@ -185,13 +144,10 @@ class NodeTest {
         chillout(500);
 
         assertEquals(node3.getFileHash(), node2.getFileHash());
-        node3.close();
-        node2.close();
-        node1.close();
         chillout(1000);
     }
 
-    @Test
+    // @Test
     void correctClusterSizeCommunication() throws ConnectException {
         Node node1 = createAndStartNode(getRandomPort(), "Abigail");
         chillout(200);
@@ -226,8 +182,58 @@ class NodeTest {
         assertEquals(2, node2.getLatestClusterSize());
         assertEquals(2, node3.getLatestClusterSize());
     }
+
+    // @Test
+    void initializeMessageBaseRight_rightButMissingMessages() throws IOException {
+        deleteMessagesFile("Abigail");
+        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+
+        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        assertEquals(2, node1.getCurrentWriteIndex());
+
+
+        deleteMessagesFile("Betram");
+        writeToFile("Bertram", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant");
+        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        assertEquals(1, node2.getCurrentWriteIndex());
+
+        chillout(2000);
+        assertEquals(2, node2.getCurrentWriteIndex());
+    }
+
+    // @Test
+    void initializeMessageBaseRight_faultyMessages() throws IOException {
+        deleteMessagesFile("Abigail");
+        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+
+        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        assertEquals(2, node1.getCurrentWriteIndex());
+
+
+        deleteMessagesFile("Bertram");
+        writeToFile("Bertram", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participan");
+
+        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        chillout(1000);
+        assertEquals(2, node2.getCurrentWriteIndex());
+    }
+
+    // @Test
+    void initializeMessageBaseRight_NoMessageFile() throws IOException {
+        deleteMessagesFile("Abigail");
+        writeToFile("Abigail", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+
+        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        assertEquals(2, node1.getCurrentWriteIndex());
+
+
+        deleteMessagesFile("Bertram");
+        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        chillout(1000);
+        assertEquals(2, node2.getCurrentWriteIndex());
+    }
   
-    //@Test
+    // @Test
     void killingCoordinatorTriggersReElection() throws IOException {
         try {
             setupThreeNodeCluster();
@@ -244,6 +250,49 @@ class NodeTest {
         assertTrue(nodes.stream().anyMatch(
                 x -> x.getRole().contains("Coordinator")));
         assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
+    }
+
+
+    /***
+     *  Helper methods
+     */
+
+
+    private static Node createAndStartNode(int port, String name) throws ConnectException {
+        Node node = new Node(port,name);
+
+        Thread searchClusterTh = node.getSearchClusterThread();
+        searchClusterTh.start();
+        try {
+            searchClusterTh.join();
+        } catch (InterruptedException e) {
+            fail("Waiting for search cluster.");
+        }
+        nodes.add(node);
+        return node;
+    }
+
+    private static void setupThreeNodeCluster() throws IOException {
+        Node node = createAndStartNode(getRandomPort(), "Alice");
+        assertTrue(node.getClusterNames().isEmpty());
+        coordinator = node;
+
+        Node node2 = createAndStartNode(getRandomPort(), "Bob");
+        waitASec();
+        assertFalse(node2.getClusterNames().isEmpty());
+        assertTrue(node.getClusterNames().keySet().contains(node2.getPort()));
+        assertTrue(node.getClusterNames().values().contains("Bob"));
+        assertTrue(node2.getClusterNames().keySet().contains(node.getPort()));
+        assertTrue(node2.getClusterNames().values().contains("Alice"));
+
+        Node node3 = createAndStartNode(getRandomPort(), "Charlie");
+        waitASec();
+        assertNotNull(node3.getClusterNames());
+        assertTrue(node3.getClusterNames().keySet().contains(node.getPort()));
+        assertTrue(node3.getClusterNames().keySet().contains(node2.getPort()));
+        assertTrue(node3.getClusterNames().values().contains("Alice"));
+        assertTrue(node3.getClusterNames().values().contains("Bob"));
+        System.out.println("\n\n\nThree node cluster - setup complete");
     }
   
     private static void waitASec() {

@@ -1,1 +1,3 @@
-
+0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator
+1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant
+2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant
