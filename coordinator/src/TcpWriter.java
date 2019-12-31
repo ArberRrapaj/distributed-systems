@@ -36,7 +36,7 @@ public class TcpWriter extends Thread {
         this.socket = socket;
         this.node = node;
         this.id = socket.getPort();
-        System.out.println("\nOh, there is a new connection: " + socket);
+        // System.out.println("\nOh, there is a new connection: " + socket);
         setupInOutput();
     }
 
@@ -49,7 +49,7 @@ public class TcpWriter extends Thread {
             close();
             throw new ConnectException("Failed to connect to: " + port + e);
         }
-        System.out.println("TCPClient connected socket: " + socket);
+        // System.out.println("TCPClient connected socket: " + socket);
         connectionPort = socket.getLocalPort();
     }
 

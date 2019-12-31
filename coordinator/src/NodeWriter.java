@@ -26,7 +26,8 @@ public class NodeWriter extends Thread {
             try {
                 while (hasNextLine()) {
                     message = inputScanner.nextLine();
-                    role.sendMessage(message);
+                    role.node.messageQueue.sendMessage(message);
+                    // role.sendMessage(message);
                 }
             } catch (IOException e) {
                 running = false;

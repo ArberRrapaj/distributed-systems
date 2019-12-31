@@ -23,25 +23,27 @@ public class Participant extends Role implements Runnable {
     }
 
     public void run() {
-        listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
+        listenerThread = new Thread(coordTcpListener, "coordTcpListener-" + node.getName());
         listenerThread.start();
+
+        System.out.println(node.name + ": I wanna introduce myself to the coordinator");
+        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
     }
 
     private void joinCluster(int coordinator, String coordinatorName) throws IOException {
         clusterNames = new HashMap<>();
-        addToCluster(coordinator, coordinatorName);
+        // addToCluster(coordinator, coordinatorName);
 
-        System.out.println("Port " + node.getPort() + " joining cluster of: " + coordinatorName + " " + coordinator);
+        System.out.println("Port " + node.getPort() + "(" + node.name + ") joining cluster of: " + coordinator + "(" + coordinatorName + ")");
         establishCoordConnection(coordinator);
 
         // TODO: handleMessagesFile()
-
     }
 
 
     private void establishCoordConnection(int coordinator) throws IOException {
         coordTcpWriter = new TcpWriter(node.getPort(), coordinator, this, node);
-        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket());
+        coordTcpListener = new TcpListener(this, node, coordTcpWriter.getSocket(), coordinator);
     }
 
     public void sendMessage(String message) {
@@ -50,39 +52,58 @@ public class Participant extends Role implements Runnable {
         coordTcpWriter.write(StandardMessages.WANNA_SEND_MESSAGE + " " + node.name + "$" + message);
     }
 
-    public void actionOnMessage(Message message) {
+    public void actionOnMessage(Message message, boolean duringInformationExchange) {
         // Cluster Update by the Coordinator
         // Pattern joinPattern = Pattern.compile("CLUSTER \\((\\d+)\\)\\(\\( [^\\s]+ [^\\s]+\\)*\\)");
         // Matcher joinMatcher = joinPattern.matcher(message.getText());
         // if (joinMatcher.find()) {
-        if (message.startsWith("CLUSTER")) {
-            // Message format: CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
-            String[] messageSplit = message.split(" ");
-            int coordinatorsIndex = Integer.parseInt(messageSplit[1]);
-            // TODO: check coordinatorsIndex ?<=>? myIndex
 
-            if (messageSplit.length > 2) {
-                for (int i = 2; i < messageSplit.length; i += 2) {
-                    int port = Integer.valueOf(messageSplit[i + 1]);
-                    String name = messageSplit[i];
-                    if(port != node.getPort()) {
-                        addToCluster(port, name);
-                        System.out.println("Added " + name + " to cluster");
+        if (duringInformationExchange) {
+            int localSenderPort = message.getSender();
+            if (message.startsWith(StandardMessages.INTRODUCTION_COORDINATOR.toString())) {
+                // String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_COORDINATOR);
+                // int clusterSize = Integer.parseInt(content);
+                System.out.println(node.name + ": got introduction back from coordinator, will send out queued messages now");
+                coordTcpListener.informationExchanged = true;
+                node.messageQueue.sendQueuedMessages();
+
+                /*
+                coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
+                coordTcpListener.informationExchanged = true;
+                node.messageQueue.sendQueuedMessages();
+                 */
+            }
+        } else {
+            if (message.startsWith("CLUSTER")) {
+                // Message format: CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
+                String[] messageSplit = message.split(" ");
+                int coordinatorsIndex = Integer.parseInt(messageSplit[1]);
+                // TODO: check coordinatorsIndex ?<=>? myIndex
+                clusterNames.clear();
+
+                addToCluster(coordinator, coordinatorName);
+                if (messageSplit.length > 2) {
+                    for (int i = 2; i < messageSplit.length; i += 2) {
+                        int port = Integer.valueOf(messageSplit[i + 1]);
+                        String name = messageSplit[i];
+                        if(port != node.getPort()) {
+                            addToCluster(port, name);
+                            System.out.println("Added " + name + " to cluster");
+                        }
                     }
                 }
+                node.setLatestClusterSize(clusterNames.size());
+            } else if (message.startsWith(StandardMessages.WANNA_SEND_RESPONSE.toString())) {
+                message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
+                try {
+                    node.multicaster.send(message.asNewMessage());
+                    node.messageQueue.handleNewMessage(message);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else if (message.startsWith(StandardMessages.CLOSE.toString())) {
+                node.close();
             }
-          node.setLatestClusterSize(clusterNames.size());
-        } else if (message.startsWith(StandardMessages.WANNA_SEND_RESPONSE.toString())) {
-            message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
-            try {
-                node.multicaster.send(message.asNewMessage());
-                // TODO: Do it like this or use existing listen() in multicaster?
-                node.messageQueue.handleNewMessage(message);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else if (message.startsWith(StandardMessages.CLOSE.toString())) {
-            node.close();
         }
 
 
@@ -92,6 +113,11 @@ public class Participant extends Role implements Runnable {
         close();
         System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
         // initiateReElection(); TODO: Why?
+    }
+
+    @Override
+    public boolean informationExchanged() {
+        return coordTcpListener.informationExchanged;
     }
 
 

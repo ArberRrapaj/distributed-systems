@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static java.lang.Thread.sleep;
 
@@ -13,9 +14,13 @@ public class Coordinator extends Role implements Runnable {
     private final Status status = Status.COORDINATOR;
 
     private ServerSocket newConnectionsSocket;
-    private Map<Integer, TcpWriter> clusterWriters;
+    Map<Integer, TcpWriter> clusterWriters;
     Map<Integer, TcpListener> clusterListeners;
-    private Map<Integer, Thread> listenerThreads;
+    Map<Integer, Thread> listenerThreads;
+
+    private Map<Integer, TcpWriter> introductionWriters;
+    private Map<Integer, TcpListener> introductionListeners;
+    private Map<Integer, Thread> introductionListenerThreads;
 
     private volatile boolean listening;
 
@@ -50,6 +55,9 @@ public class Coordinator extends Role implements Runnable {
         clusterListeners = new HashMap<>();
         listenerThreads = new HashMap<>();
 
+        introductionWriters = new HashMap<>();
+        introductionListeners = new HashMap<>();
+        introductionListenerThreads = new HashMap<>();
     }
 
     public void run() {
@@ -65,17 +73,18 @@ public class Coordinator extends Role implements Runnable {
             try {
                 System.out.println("I'll be listening for new connections on port: " + node.getPort());
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
-                System.out.println("New Connection: " + newSocket);
-                TcpListener newTcpListener = new TcpListener(this, node, newSocket);
-
+                // System.out.println("New Connection: " + newSocket);
                 int port = newSocket.getPort();
-                clusterListeners.put(port, newTcpListener);
-                listenerThreads.put(port, new Thread(newTcpListener, "TcpListener-"+node.getName()+"-"+port));
-                listenerThreads.get(port).start();
-                TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
-                clusterWriters.put(port, newTcpWriter);
+                TcpListener newTcpListener = new TcpListener(this, node, newSocket, port);
 
-                welcomeNewNodeToCluster();
+                // System.out.println(node.name + ": port=" + port + "; newTcpListener=" + newTcpListener);
+                introductionListeners.put(port, newTcpListener);
+                introductionListenerThreads.put(port, new Thread(newTcpListener, "TcpListener-" + node.getName() + "-" + port));
+                introductionListenerThreads.get(port).start();
+                TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
+                introductionWriters.put(port, newTcpWriter);
+
+                // welcomeNewNodeToCluster();
 
             } catch (IOException e) {
                 node.suicide();
@@ -88,13 +97,17 @@ public class Coordinator extends Role implements Runnable {
         shareUpdatedClusterInfo();
     }
 
+    /* Message is of format:
+        CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
+    */
     private String getCurrentClusterInfo() {
-        // TODO: use upon newly established or broken Socket Connnection -> Share among all
-        /* Message is of format:
-           CLUSTER <Sequenz-Nr.> <Knoten1-Name> <Knoten1-Port> <Knoten2-Name> <Knoten2-Port>
-        */
-        StringBuilder message = new StringBuilder("CLUSTER " + getWriteIndex());
-        for (Integer port : clusterNames.keySet()) {
+        // TODO: use upon broken Socket Connnection -> Share among all
+
+        StringBuilder message = new StringBuilder("CLUSTER " + node.getCurrentWriteIndex());
+        Set<Integer> portSet = clusterNames.keySet();
+        node.setLatestClusterSize(portSet.size());
+
+        for (Integer port : portSet) {
             message.append(" " + clusterNames.get(port) + " " + port);
         }
 
@@ -105,7 +118,7 @@ public class Coordinator extends Role implements Runnable {
         String message = getCurrentClusterInfo();
 
         for(TcpWriter writer : clusterWriters.values()) {
-            writer.write(message.toString());
+            writer.write(message);
         }
 
     }
@@ -132,53 +145,87 @@ public class Coordinator extends Role implements Runnable {
         else System.out.println(node.name + ": writer is null for sendMessageTo");
     }
 
-    public void actionOnMessage(Message message) {
+    public void actionOnMessage(Message message, boolean duringInformationExchange) {
         System.out.println("Coordinator action on " + message);
 
-        if (message.startsWith(StandardMessages.WANNA_SEND_MESSAGE.toString())) {
-            String content = message.toString().substring(StandardMessages.WANNA_SEND_MESSAGE.length() + 1);
-            System.out.println(content + "/");
-            String[] contentSplit = content.split("\\$", 2); // [0] = Name; [1] = Message
-            message.setName(contentSplit[0]);
-            message.setText(contentSplit[1]);
-            message.setIndex(node.getNewWriteAheadIndex());
-            message.setTimestamp(new Timestamp(new Date().getTime()).toString());
-            sendMessageTo(message.getSender(), message.asWannaSendResponse());
-        }
-        /* from ClusterNodeListener
-        if (nextLine.equals(StandardMessages.SEND_FILE_HASH.toString())) {
-            clusterNode.write(StandardMessages.ANSWER_TIME.toString());
-            clusterNode.write("The file's hash is: " + clusterNode.headNode.getFilesHash());
-            clusterNode.handleHandshake("THANKS");
-            continue;
-        }
-        if (nextLine.equals(StandardMessages.ANSWER_TIME.toString())) continue;
-        if (nextLine.equals(StandardMessages.REQUEST_TIME.toString())) {
-            clusterNode.write(StandardMessages.ANSWER_TIME.toString());
-            clusterNode.write("The current time is: " + new Timestamp(new Date().getTime()));
-            clusterNode.handleHandshake("THANKS");
-            continue;
-        }
-        clusterNode.receivedMessageToWrite(nextLine);
-       */
+        if (duringInformationExchange) {
+            int localSenderPort = message.getSender();
+            if (message.startsWith(StandardMessages.INTRODUCTION_PARTICIPANT.toString())) {
+                System.out.println(node.name + ": got an introduction from participant");
 
-        /*
-        Pattern timestampPattern = Pattern.compile("The current time is: ([0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]) (2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9].[0-9]{1,3})");
-        Matcher timestampMatcher = timestampPattern.matcher(message);
-        if (timestampMatcher.find()) {
-            // System.out.println(timestampMatcher.group(1));
-            clusterNode.setTimestamp(timestampMatcher.group(1));
-            return "THANKS";
+                String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_PARTICIPANT);
+                String[] contentSplit = content.split("\\$", 2);
+                int actualPort = Integer.parseInt(contentSplit[0]);
+                // TcpListener
+                TcpListener listener = introductionListeners.get(localSenderPort);
+                listener.setPort(actualPort);
+                introductionListeners.remove(localSenderPort);
+                clusterListeners.put(actualPort, listener);
+
+                // ListenerThread
+                Thread listenerThread = introductionListenerThreads.get(localSenderPort);
+                listenerThread.setName("TcpListener-" + node.getName() + "-" + actualPort);
+                introductionListenerThreads.remove(localSenderPort);
+                listenerThreads.put(actualPort, listenerThread);
+                listener.informationExchanged = true;
+
+                // TcpWriter
+                TcpWriter writer = introductionWriters.get(localSenderPort);
+                introductionWriters.remove(localSenderPort);
+                clusterWriters.put(actualPort, writer);
+
+                clusterNames.put(actualPort, contentSplit[1]);
+                writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + clusterNames.size());
+
+                welcomeNewNodeToCluster();
+            }
+        } else {
+            if (message.startsWith(StandardMessages.WANNA_SEND_MESSAGE.toString())) {
+                String content = message.withoutStandardPart(StandardMessages.WANNA_SEND_MESSAGE);
+                System.out.println(content + "/" + message.getSender() + "/");
+                String[] contentSplit = content.split("\\$", 2); // [0] = Name; [1] = Message
+                message.setName(contentSplit[0]);
+                message.setText(contentSplit[1]);
+                message.setIndex(node.getNewWriteAheadIndex());
+                message.setTimestamp(new Timestamp(new Date().getTime()).toString());
+                sendMessageTo(message.getSender(), message.asWannaSendResponse());
+            }
+            /* from ClusterNodeListener
+            if (nextLine.equals(StandardMessages.SEND_FILE_HASH.toString())) {
+                clusterNode.write(StandardMessages.ANSWER_TIME.toString());
+                clusterNode.write("The file's hash is: " + clusterNode.headNode.getFilesHash());
+                clusterNode.handleHandshake("THANKS");
+                continue;
+            }
+            if (nextLine.equals(StandardMessages.ANSWER_TIME.toString())) continue;
+            if (nextLine.equals(StandardMessages.REQUEST_TIME.toString())) {
+                clusterNode.write(StandardMessages.ANSWER_TIME.toString());
+                clusterNode.write("The current time is: " + new Timestamp(new Date().getTime()));
+                clusterNode.handleHandshake("THANKS");
+                continue;
+            }
+            clusterNode.receivedMessageToWrite(nextLine);
+           */
+
+            /*
+            Pattern timestampPattern = Pattern.compile("The current time is: ([0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]) (2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9].[0-9]{1,3})");
+            Matcher timestampMatcher = timestampPattern.matcher(message);
+            if (timestampMatcher.find()) {
+                // System.out.println(timestampMatcher.group(1));
+                clusterNode.setTimestamp(timestampMatcher.group(1));
+                return "THANKS";
+            }
+
+            Pattern fileHashPattern = Pattern.compile("The file's hash is: (.+)");
+            Matcher fileHashMatcher = fileHashPattern.matcher(message);
+            if (fileHashMatcher.find()) {
+                // System.out.println(fileHashMatcher.group(1));
+                clusterNode.setHash(fileHashMatcher.group(1));
+                return "THANKS";
+            }
+            */
         }
 
-        Pattern fileHashPattern = Pattern.compile("The file's hash is: (.+)");
-        Matcher fileHashMatcher = fileHashPattern.matcher(message);
-        if (fileHashMatcher.find()) {
-            // System.out.println(fileHashMatcher.group(1));
-            clusterNode.setHash(fileHashMatcher.group(1));
-            return "THANKS";
-        }
-        */
     }
 
     public void killClusterNode(int port) {
@@ -200,17 +247,25 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void listenerDied(int port) {
-        System.out.println(node.name + ": Coordinator-Listener died");
-        killClusterNode(port);
+        System.out.println(node.name + ": Coordinator-Listener died with port: " + port);
+        // killClusterNode(port);
+        handleDeathOf(port);
         shareUpdatedClusterInfo();
     }
 
+    @Override
+    public boolean informationExchanged() {
+        return true;
+    }
+
     public void handleDeathOf(Integer port) {
+        System.out.println("Node " + port + " yote him/herself out of the party!");
         clusterNames.remove(port);
-        clusterWriters.get(port).close();
         listenerThreads.get(port).interrupt();
+        listenerThreads.remove(port);
         clusterListeners.get(port).close();
         clusterListeners.remove(port);
+        clusterWriters.get(port).close();
         clusterWriters.remove(port);
         shareUpdatedClusterInfo();
     }

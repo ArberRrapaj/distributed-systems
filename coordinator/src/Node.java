@@ -54,10 +54,12 @@ public class Node extends Elector {
             // Create new Node with that port
             try {
                 node = new Node(port, "Bertram");
+                /*
                 Thread searchClusterTh = node.getSearchClusterThread();
                 searchClusterTh.start();
                 searchClusterTh.join();
-            } catch(ConnectException | InterruptedException e) {
+                */
+            } catch(ConnectException e) {
                 e.printStackTrace();
                 continue;
             }
@@ -117,9 +119,7 @@ public class Node extends Elector {
                 suicide();
             }
             
-            if(received == null || received.getText().isEmpty()) {
-                continue;
-            } 
+            if(received == null || received.getText().isEmpty()) continue;
                 
             if (received.getText().startsWith(Status.COORDINATOR.toString())) {
                 int coordinator = received.getSender();
@@ -160,7 +160,7 @@ public class Node extends Elector {
     protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
         Participant part = new Participant(this, coordinator, coordinatorName);
         role = part;
-        new Thread(part, "Participant-"+name).start();
+        new Thread(part, "Participant-" + name).start();
     }
 
     protected void becomeCoordinator() throws IOException {
@@ -174,12 +174,8 @@ public class Node extends Elector {
     public void answerSearchRequest(Message message) {
 
         Status status = null;
-        if(role != null) {
-            status = role.getStatus();
-            role.addToCluster(message.getSender(), message.getText().split(" ")[2]); // COORDINATOR SEARCH <NAME>
-        } else {
-            status = this.status;
-        }
+        if (role != null) status = role.getStatus();
+        else status = this.status;
 
         try {
             multicaster.send(status.toString() + " " + name);
@@ -189,22 +185,17 @@ public class Node extends Elector {
         }
     }
 
-
     public int getPort() {
         return port;
     }
 
     public Map<Integer, String> getClusterNames() {
-        if(role != null) {
-            return role.getClusterNames();
-        }
+        if (role != null) return role.getClusterNames();
         return null;
     }
 
     public String getRole() {
-        if(role != null) {
-            return role.getClass().toString();
-        }
+        if (role != null) return role.getClass().toString();
         return null;
     }
 
@@ -242,12 +233,9 @@ public class Node extends Elector {
     }
 
     public Status getStatus() {
-        if(role != null) {
-            return role.getStatus();
-        }
+        if (role != null) return role.getStatus();
         return status;
     }
-
 
 
     // ELECTION
@@ -348,7 +336,8 @@ public class Node extends Elector {
 
             fw = new FileWriter(file.getAbsoluteFile(), true); // append the new data to end
             fw.write(line);
-            System.out.println("Written to file: " + new Timestamp(new Date().getTime()).toString());
+            // System.out.println(name + ": Written to file: " + new Timestamp(new Date().getTime()).toString());
+            System.out.println(name + ": Written to file: " + line);
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Error with writing to file");
