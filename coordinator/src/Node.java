@@ -16,7 +16,7 @@ public class Node extends Elector {
     private String IP = "localhost";
     private String MULTICAST_IP = "230.0.0.0"; // in local scope 239.*, else 230.*
     private int MULTICAST_PORT = 4321;
-    private final int MC_TIMEOUT = 1000;
+    private final int MC_TIMEOUT = 50;
 
     // Communication
     public Role role;
@@ -102,10 +102,13 @@ public class Node extends Elector {
         return new Thread(() -> {
             try {
                 sleep(1000);
-                Thread evalTh = evaluateSearchAnswers();
-                evalTh.start();
-                evalTh.join();
-                //multicaster.start();
+                Thread searchAgainThread = evaluateSearchAnswers();
+                if(searchAgainThread != null) {
+                    searchAgainThread.start();
+                    searchAgainThread.join();
+                } else {
+                    multicaster.start();
+                }
             } catch(InterruptedException e) {
                 suicide();
             }
@@ -147,7 +150,7 @@ public class Node extends Elector {
                     return waitAndRedoSearch();
                 }
                 
-                return new Thread();
+                return null;
             } else if (received.startsWith(Status.SEARCHING.toString())) {
                 // There is another mf, who is searching atm, so we wait and try again later
                 status = Status.WAITING;
@@ -161,16 +164,16 @@ public class Node extends Elector {
             suicide();
         }
 
-        return new Thread();
+        return null;
     }
 
     private Thread waitAndRedoSearch() {
         try {
             backoff++;
-            float c = Math.round(new Random().nextFloat() * backoff);
-            long k = Math.round(Math.pow(2.0, c));
+            long upperBound = Math.round(Math.pow(2.0, backoff));
+            long k = Math.round(new Random().nextFloat() * (upperBound - 1));
             System.out.println("k: " + k);
-            sleep(k * 2000);
+            sleep(k * 50);
             return getSearchClusterThread();
         } catch (InterruptedException e) {
             suicide();
