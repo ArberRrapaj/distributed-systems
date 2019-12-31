@@ -1,6 +1,7 @@
 import com.sun.tools.internal.ws.wsdl.document.jaxws.Exception;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -100,71 +101,58 @@ class NodeTest {
         Node node1 = createAndStartNode(getRandomPort(), "Abigail");
         Node node2 = createAndStartNode(getRandomPort(), "Bertram");
 
-        System.out.println("\n\n\n\nOkay, all of the nodes are active, let's send a message");
-        System.out.println("\n\n\n\nGo: " + new Timestamp(new Date().getTime()).toString());
+        node1.messageQueue.sendMessage("Nachricht #1 von Abigail(Koordinator)");
+        node2.messageQueue.sendMessage("Nachricht #2 von Betram");
+        node2.messageQueue.sendMessage("Nachricht #3 von Bertram");
 
-        node1.role.sendMessage("Nachricht #1 von Abigail(Koordinator)");
-        node2.role.sendMessage("Nachricht #2 von Betram");
-        node2.role.sendMessage("Nachricht #3 von Bertram");
-
-        // System.out.println("\n\n\n\nGo2" + new Timestamp(new Date().getTime()).toString());
-        // Go: 21:28:16.847
-        // Go2: 21:28:16.86
-        // Last 'written to file': 21:28:16.859
-
-        chillout(500);
         assertEquals(node1.getFileHash(), node2.getFileHash());
-        node2.close();
-        node1.close();
+        assertEquals(node1.lookForIndexInFile(0), node2.lookForIndexInFile(0));
     }
   
     // @Test
     void initializeRightWriteIndex() throws IOException {
-
-        Node nodeWithEntries = createAndStartNode(getRandomPort(), "nodeWithEntries");
-        Node nodeWithoutEntries = createAndStartNode(getRandomPort(), "nodeWithoutEntries");
-        Node nodeWithoutFile = createAndStartNode(getRandomPort(), "nodeWithoutFile");
-
-        System.out.println("\n\n\n\ninitializeRightWriteIndex: " + new Timestamp(new Date().getTime()).toString());
-
         deleteMessagesFile("nodeWithEntries");
         writeToFile("nodeWithEntries", "0 Abigail 2019-12-29 00:58:52.449 Nachricht von Koordinator\r\n1 Bertram 2019-12-29 00:58:52.451 Nachricht 1 von Participant\r\n2 Bertram 2019-12-29 00:58:52.451 Nachricht 2 von Participant");
+
+        Node nodeWithEntries = createAndStartNode(getRandomPort(), "nodeWithEntries");
         assertEquals(2, nodeWithEntries.initializeWriteIndex());
+
 
         deleteMessagesFile("nodeWithoutEntries");
         writeToFile("nodeWithoutEntries", "");
+
+        Node nodeWithoutEntries = createAndStartNode(getRandomPort(), "nodeWithoutEntries");
         assertEquals(-1, nodeWithoutEntries.initializeWriteIndex());
 
+
         deleteMessagesFile("nodeWithoutFile");
+        Node nodeWithoutFile = createAndStartNode(getRandomPort(), "nodeWithoutFile");
         assertEquals(-1, nodeWithoutFile.initializeWriteIndex());
-
-        nodeWithEntries.close();
-        nodeWithoutEntries.close();
-        nodeWithoutFile.close();
-    }
-  
-    @Test
-    void closeNode() throws ConnectException {
-        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
-        System.out.println(node1.role.printCurrentlyConnected());
-
-        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
-        System.out.println(node1.role.printCurrentlyConnected());
-        chillout(2000);
-
-        node2.close();
-        chillout(2000);
-        // node2 = null;
-        System.out.println(node2.role);
-        System.out.println(node1.role.printCurrentlyConnected());
-        Coordinator coordinator = (Coordinator) node1.role;
-        // coordinator.shareUpdatedClusterInfo();
-        TcpListener listener = coordinator.clusterListeners.get(coordinator.clusterListeners.keySet().toArray()[0]);
-        System.out.println("Socket is closed: " + listener.socket.isClosed());
-        System.out.println("Socket is connected: " + listener.socket.isConnected());
     }
   
     // @Test
+    void closeNode() throws ConnectException {
+        Node node1 = createAndStartNode(getRandomPort(), "Abigail");
+        node1.role.printCurrentlyConnected();
+
+        Node node2 = createAndStartNode(getRandomPort(), "Bertram");
+        node1.role.printCurrentlyConnected();
+        chillout(500);
+
+        node2.close();
+        chillout(500);
+
+        assertEquals(0, node1.role.printCurrentlyConnected());
+
+        Coordinator coordinator = (Coordinator) node1.role;
+        assertEquals(0, coordinator.clusterNames.size());
+        assertEquals(0, coordinator.clusterListeners.size());
+        assertEquals(0, coordinator.listenerThreads.size());
+        assertEquals(0, coordinator.clusterWriters.size());
+    }
+  
+    //@RepeatedTest(10)
+    //@Test
     void recoverFromDisconnect() throws ConnectException {
         deleteMessagesFile("Abigail");
         deleteMessagesFile("Bertram");
@@ -174,15 +162,16 @@ class NodeTest {
         Node node2 = createAndStartNode(getRandomPort(), "Bertram");
         Node node3 = createAndStartNode(getRandomPort(), "Camille");
 
-        node1.role.sendMessage("Nachricht #1 von Koordinator");
-        node2.role.sendMessage("Nachricht #2 von Bertram");
+        node1.messageQueue.sendMessage("Nachricht #1 von Koordinator");
+        node2.messageQueue.sendMessage("Nachricht #2 von Bertram");
 
-        // TODO: Do smth about this need for timeout
         chillout(500);
         node2.close();
 
-        node3.role.sendMessage("Nachricht #3 von Camille");
-        chillout(200);
+        node3.messageQueue.sendMessage("Nachricht #3 von Camille");
+        node1.messageQueue.sendMessage("Nachricht #4 von Koordinator");
+
+        chillout(500);
 
         assertEquals(node3.getFileHash(), node1.getFileHash());
         assertNotEquals(node3.getFileHash(), node2.getFileHash());
@@ -190,11 +179,16 @@ class NodeTest {
         node2 = createAndStartNode(getRandomPort(), "Bertram");
         assertEquals(1, node2.getCurrentWriteIndex());
 
-        node2.role.sendMessage("Nachricht #4 von Betram, nach Disconnect");
+        node2.messageQueue.sendMessage("Nachricht #5 von Bertram, nach Disconnect");
 
-        chillout(1000);
+        chillout(500);
 
         assertEquals(node3.getFileHash(), node2.getFileHash());
+        node3.close();
+        node2.close();
+        node1.close();
+        chillout(1000);
+
     }
   
     // @Test

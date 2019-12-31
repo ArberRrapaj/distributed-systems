@@ -72,6 +72,10 @@ public class Message {
         return standardMessage.toString() + " " + getStandardLine();
     }
 
+    public String withoutStandardPart(StandardMessages standardMessage) {
+        return toString().substring(standardMessage.length() + 1);
+    }
+
     public Message sanitizeMessage(StandardMessages standardMessage) {
         String[] messageSplit = getText().substring(standardMessage.length() + 1).split("\\$", 4);
         setName(messageSplit[1]);

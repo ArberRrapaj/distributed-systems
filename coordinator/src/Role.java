@@ -1,5 +1,3 @@
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,9 +36,11 @@ public abstract class Role {
         sendMessage(StandardMessages.REQUEST_MESSAGE.toString() + " " + messageIndex);
     }
 
-    public abstract void actionOnMessage(Message message);
+    public abstract void actionOnMessage(Message message, boolean duringInformationExchange);
 
     public abstract void listenerDied(int port);
+
+    public abstract boolean informationExchanged();
 
     protected int getWriteIndex() {
         return node.getWriteIndex();
