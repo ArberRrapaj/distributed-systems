@@ -81,7 +81,7 @@ public class Coordinator extends Role implements Runnable {
                 introductionListeners.put(port, newTcpListener);
                 introductionListenerThreads.put(port, new Thread(newTcpListener, "TcpListener-" + node.getName() + "-" + port));
                 introductionListenerThreads.get(port).start();
-                TcpWriter newTcpWriter = new TcpWriter(node.getPort(), newSocket, node);
+                TcpWriter newTcpWriter = new TcpWriter(newSocket, node);
                 introductionWriters.put(port, newTcpWriter);
 
                 // welcomeNewNodeToCluster();
@@ -114,7 +114,7 @@ public class Coordinator extends Role implements Runnable {
         return message.toString();
     }
 
-    void shareUpdatedClusterInfo() {
+    private void shareUpdatedClusterInfo() {
         String message = getCurrentClusterInfo();
 
         for(TcpWriter writer : clusterWriters.values()) {
@@ -190,45 +190,11 @@ public class Coordinator extends Role implements Runnable {
                 message.setTimestamp(new Timestamp(new Date().getTime()).toString());
                 sendMessageTo(message.getSender(), message.asWannaSendResponse());
             }
-            /* from ClusterNodeListener
-            if (nextLine.equals(StandardMessages.SEND_FILE_HASH.toString())) {
-                clusterNode.write(StandardMessages.ANSWER_TIME.toString());
-                clusterNode.write("The file's hash is: " + clusterNode.headNode.getFilesHash());
-                clusterNode.handleHandshake("THANKS");
-                continue;
-            }
-            if (nextLine.equals(StandardMessages.ANSWER_TIME.toString())) continue;
-            if (nextLine.equals(StandardMessages.REQUEST_TIME.toString())) {
-                clusterNode.write(StandardMessages.ANSWER_TIME.toString());
-                clusterNode.write("The current time is: " + new Timestamp(new Date().getTime()));
-                clusterNode.handleHandshake("THANKS");
-                continue;
-            }
-            clusterNode.receivedMessageToWrite(nextLine);
-           */
-
-            /*
-            Pattern timestampPattern = Pattern.compile("The current time is: ([0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]) (2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9].[0-9]{1,3})");
-            Matcher timestampMatcher = timestampPattern.matcher(message);
-            if (timestampMatcher.find()) {
-                // System.out.println(timestampMatcher.group(1));
-                clusterNode.setTimestamp(timestampMatcher.group(1));
-                return "THANKS";
-            }
-
-            Pattern fileHashPattern = Pattern.compile("The file's hash is: (.+)");
-            Matcher fileHashMatcher = fileHashPattern.matcher(message);
-            if (fileHashMatcher.find()) {
-                // System.out.println(fileHashMatcher.group(1));
-                clusterNode.setHash(fileHashMatcher.group(1));
-                return "THANKS";
-            }
-            */
         }
 
     }
 
-    public void killClusterNode(int port) {
+    private void killClusterNode(int port) {
         System.out.println("killing: " + port);
         clusterNames.remove(port);
 
@@ -236,8 +202,6 @@ public class Coordinator extends Role implements Runnable {
         if (writerToRemove != null) {
             writerToRemove.close();
             System.out.println("Node " + port + " yote him/herself out of the party!");
-            int nodesLeft = printCurrentlyConnected();
-            // TODO: last node leaves the gang
         } // else = not found - can this even happen?
 
         TcpListener listenerToRemove = clusterListeners.getOrDefault(port, null);
@@ -259,14 +223,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void handleDeathOf(Integer port) {
-        System.out.println("Node " + port + " yote him/herself out of the party!");
-        clusterNames.remove(port);
-        listenerThreads.get(port).interrupt();
-        listenerThreads.remove(port);
-        clusterListeners.get(port).close();
-        clusterListeners.remove(port);
-        clusterWriters.get(port).close();
-        clusterWriters.remove(port);
+        killClusterNode(port);
         shareUpdatedClusterInfo();
     }
 

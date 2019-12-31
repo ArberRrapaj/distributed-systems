@@ -9,16 +9,16 @@ public enum Status {
     ADVERTISED("ELECTION", true, 1),
     EVALUATION("ELECTION", true, 2),
     ELECTED("ELECT", true, 3),
-    EVALVOTES("ELECTION", true, 4);
+    VOTE_EVALUATION("ELECTION", true, 4);
 
     private final String messageRegex;
     private final boolean inElection;
-    private final int electionseqNum;
+    private final int electionSeqNum;
 
     Status(String messageRegex, boolean inElection, int electionSeqNum) {
         this.messageRegex = messageRegex;
         this.inElection = inElection;
-        this.electionseqNum = electionSeqNum;
+        this.electionSeqNum = electionSeqNum;
     }
 
     public String toString() {
@@ -30,15 +30,15 @@ public enum Status {
     }
 
     public boolean hasAdvertised()  {
-       return inElection && electionseqNum > 0;
+       return inElection && electionSeqNum > 0;
     }
 
     public boolean isEvaluating() {
-        return inElection && electionseqNum > 1;
+        return inElection && electionSeqNum > 1;
     }
 
     public boolean hasElected() {
-        return inElection && electionseqNum > 2;
+        return inElection && electionSeqNum > 2;
     }
 
     public boolean notDead() {

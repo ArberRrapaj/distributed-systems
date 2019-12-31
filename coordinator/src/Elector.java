@@ -21,7 +21,7 @@ public abstract class Elector {
         if(!getStatus().isInElection() && !hasRecentlyElected()
                 && getStatus() != Status.DEAD) {
 
-            this.status = Status.ELECTION;
+            status = Status.ELECTION;
             lastElection = new Date();
 
             this.electionCandidates = new HashMap<>();
@@ -87,8 +87,6 @@ public abstract class Elector {
                 } else if(compare < 0) {
                     promoteCandidate(electionCandidates.size(), bestCandidate, candidateNames.get(
                             bestCandidate.getKey()));
-                } else {
-                    // impossible.
                 }
             } else {
                 try {
@@ -152,7 +150,7 @@ public abstract class Elector {
 
     private void evaluateVotes() {
         if(getStatus().hasElected()) {
-            status = Status.EVALVOTES;
+            status = Status.VOTE_EVALUATION;
             Optional<Map.Entry<Integer, Integer>> voteWinner = electionVotes.entrySet().stream()
                     .max((c1, c2) -> compareTwoCandidates(c1, c2));
 

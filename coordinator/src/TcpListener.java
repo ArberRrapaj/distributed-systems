@@ -1,16 +1,13 @@
 import java.io.*;
 import java.net.Socket;
-import java.sql.Timestamp;
-import java.util.Date;
-
 
 public class TcpListener extends Thread {
 
-    protected BufferedReader in;
+    private BufferedReader in;
     private Role role;
     private Node node;
     private int port;
-    Socket socket;
+    private Socket socket;
     private volatile boolean listening = true;
     volatile boolean informationExchanged = false;
 
@@ -90,14 +87,6 @@ public class TcpListener extends Thread {
             }
         }
 
-    }
-
-    public void stopListening() {
-        listening = false;
-    }
-
-    public void restartListening() {
-        listening = true;
     }
 
     public void setPort(int port) { this.port = port; }

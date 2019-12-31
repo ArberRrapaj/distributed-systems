@@ -31,9 +31,9 @@ public class Participant extends Role {
 
 
     private void establishCoordConnection(int coordinator) throws IOException {
-        coordTcpWriter = new TcpWriter(node.getPort(), this, node);
+        coordTcpWriter = new TcpWriter(this, node);
         Socket socket = coordTcpWriter.connect(coordinator);
-        coordTcpListener = new TcpListener(this, node, socket);
+        coordTcpListener = new TcpListener(this, node, socket, node.getPort());
         listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
         listenerThread.start();
     }

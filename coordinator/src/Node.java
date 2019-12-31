@@ -1,16 +1,11 @@
 import javax.xml.bind.DatatypeConverter;
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
 import java.io.*;
 import java.net.*;
-import java.nio.Buffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 import java.util.*;
-import java.util.stream.Stream;
-import java.util.concurrent.TimeoutException;
 import static java.lang.Thread.sleep;
 
 public class Node extends Elector {
@@ -24,22 +19,15 @@ public class Node extends Elector {
     private static final int MC_TIMEOUT = 1000;
 
     // Communication
-    Role role; // Public for testing purpose
-    int writeIndex = -1;
-    int writeAheadIndex = -1;
-    MessageQueue messageQueue = new MessageQueue(this);
-    // Ports:
+    public Role role;
+    public MessageQueue messageQueue = new MessageQueue(this);
+    public Multicaster multicaster;
+    private int writeIndex = -1;
+    private int writeAheadIndex = -1;
     private int port;
     private int latestClusterSize;
-    // Connections:
-    private ServerSocket newConnectionsSocket;
-    public Multicaster multicaster;
-    // Status:
-    private boolean running = true;
-    public String name = null; // Public for testing purpose
-    private Status status;
+    public String name;
     private Thread coordinatorThread;
-
 
     public static void main(String[] args) {
         // Choose a random port in range of LOWER_PORT - UPPER_PORT
@@ -75,7 +63,7 @@ public class Node extends Elector {
         this.port = port;
         initializeWriteIndex();
         writeAheadIndex = writeIndex;
-        multicaster = new Multicaster(this, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
+        multicaster = new Multicaster(this, messageQueue, MULTICAST_IP, MULTICAST_PORT, MC_TIMEOUT);
     }
 
 
@@ -155,8 +143,7 @@ public class Node extends Elector {
     }
 
     protected void becomeParticipant(int coordinator, String coordinatorName) throws IOException {
-        Participant part = new Participant(this, coordinator, coordinatorName);
-        role = part;
+        role =  new Participant(this, coordinator, coordinatorName);
     }
 
     protected void becomeCoordinator() throws IOException {
@@ -166,18 +153,11 @@ public class Node extends Elector {
         coordinatorThread.start();
     }
 
-
     public void answerSearchRequest(Message message) {
-
-        Status status = null;
-        if (role != null) status = role.getStatus();
-        else status = this.status;
-
         try {
-            multicaster.send(status.toString() + " " + name);
+            multicaster.send(getStatus().toString() + " " + name);
         } catch(IOException e) {
             // instance that requested no longer available. Ignore.
-            e.printStackTrace();
         }
     }
 
@@ -195,7 +175,7 @@ public class Node extends Elector {
         return null;
     }
 
-    public void announceYourDeath() {
+    private void announceYourDeath() {
         try {
             this.multicaster.send(Status.DEAD.toString() + " " + name);
         } catch (NullPointerException | IOException e) {
@@ -204,7 +184,7 @@ public class Node extends Elector {
     }
 
     public void suicide() {
-        if(status != Status.DEAD) {
+        if(getStatus() != Status.DEAD) {
             status = Status.DEAD;
             announceYourDeath();
             if(role != null) {
@@ -287,40 +267,6 @@ public class Node extends Elector {
         }
     }
 
-
-
-    /* MESSAGE, FILE ETC.
-    public void sendMessage(String message) {
-        String timestamp;
-
-        if(status == Status.COORDINATOR) {
-            timestamp = new Timestamp(new Date().getTime()).toString();
-            System.out.println("I am the coordinator, so I don't have to ask for a timestamp");
-        } else {
-            TcpWriter coordinatorNode = cluster.get(coordinator);
-            timestamp = coordinatorNode.requestTimestamp();
-        }
-
-        message = timestamp + "@" + port + ": " + message;
-        writeTextToFile(message);
-
-        for (Map.Entry<Integer, TcpWriter> entry : cluster.entrySet()) {
-            entry.getValue().write(message);
-        }
-    }
-
-    public boolean deleteMessagesFile() {
-        File file = new File(port + ".txt");
-        try {
-            return Files.deleteIfExists(file.toPath());
-        } catch (IOException e) {
-            // e.printStackTrace();
-            System.out.println("Couldn't delete file, flop");
-            return false;
-        }
-    }
-
-    */
     public void writeToFile(Message message) {
         String line = message.getLine() + "\r\n";
 
@@ -395,9 +341,6 @@ public class Node extends Elector {
                 }
                 // messageQueue.putIntoMessages(lineIndex, line);
             }
-            return null;
-        } catch (FileNotFoundException e) {
-            // e.printStackTrace();
             return null;
         } catch (IOException e) {
             // e.printStackTrace();

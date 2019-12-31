@@ -1,8 +1,5 @@
 import com.sun.istack.internal.NotNull;
 
-import java.sql.Timestamp;
-import java.util.Date;
-
 public class Message {
 
     public Integer getSender() {

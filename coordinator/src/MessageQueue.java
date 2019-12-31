@@ -4,10 +4,10 @@ import java.util.stream.Collectors;
 
 public class MessageQueue {
 
-    Node node;
-    Map<Integer, Message> toWrite = new HashMap<>();
-    Queue<String> toSend = new LinkedList<>();
-    Map<Integer, Message> messages = new HashMap<>();
+    private Node node;
+    private Map<Integer, Message> toWrite = new HashMap<>();
+    private Queue<String> toSend = new LinkedList<>();
+    private Map<Integer, Message> messages = new HashMap<>();
 
     public MessageQueue(Node node) {
         this.node = node;
@@ -26,11 +26,11 @@ public class MessageQueue {
     }
 
     public void handleNewMessage(Message received) {
-        // System.out.println(node.name + ": That's a new message, Index: " + received.getIndex() + "; My WriteIndex: " + node.getCurrentWriteIndex());
+        // System.out.println(node.getName() + ": That's a new message, Index: " + received.getIndex() + "; My WriteIndex: " + node.getCurrentWriteIndex());
 
         System.out.println("handleNewMessage-Participant");
         if ( node.getNextWriteIndex() == received.getIndex() ){
-            System.out.println(node.name + ": It's the next message according to the write index, so let's write it down; wi:" + node.getCurrentWriteIndex() + "; mi:" + received.getIndex());
+            System.out.println(node.getName() + ": It's the next message according to the write index, so let's write it down; wi:" + node.getCurrentWriteIndex() + "; mi:" + received.getIndex());
             node.writeToFile(received);
             node.getNewWriteIndex();
             checkForAvailableMessagesToWrite();
@@ -40,8 +40,8 @@ public class MessageQueue {
     }
 
     public void receivedHigherMessage(Message message) {
-        System.out.println(node.name + ": a higher message, according to write index, ask for oldies; wi:" + node.getCurrentWriteIndex() + "; mi:" + message.getIndex());
-        // System.out.println(node.name + ": receivedHigherMessage");
+        System.out.println(node.getName() + ": a higher message, according to write index, ask for oldies; wi:" + node.getCurrentWriteIndex() + "; mi:" + message.getIndex());
+        // System.out.println(node.getName() + ": receivedHigherMessage");
 
         toWrite.put(message.getIndex(), message);
         Set<Integer> keys = toWrite.keySet();
@@ -50,12 +50,12 @@ public class MessageQueue {
         for(int key : keys) if (maxIndex < key) maxIndex = key;
 
         // TODO: Optimize, many potential redundant messages
-        for (int i = node.writeIndex + 1; i <= maxIndex; i++) {
+        for (int i = node.getWriteIndex() + 1; i <= maxIndex; i++) {
             if (toWrite.get(i) == null) requestMessage(i);
         }
     }
 
-    public void requestMessage(int i) {
+    private void requestMessage(int i) {
         try {
             node.multicaster.send(StandardMessages.REQUEST_MESSAGE.toString() + " " + i);
         } catch (IOException e) {
@@ -65,7 +65,7 @@ public class MessageQueue {
     }
 
     public void checkForAvailableMessagesToWrite() {
-        System.out.println(node.name + ": Check for available messages to write");
+        System.out.println(node.getName() + ": Check for available messages to write");
 
         // Iterator<Integer> it = toWrite.keySet().iterator();
 
@@ -88,7 +88,7 @@ public class MessageQueue {
             Integer index = it.next();
             Message message = toWrite.get(index);
             it.remove();
-            System.out.println(node.name + ": I'm iterating, baby; " + index);
+            System.out.println(node.getName() + ": I'm iterating, baby; " + index);
             node.writeToFile(message);
         }
 
