@@ -47,7 +47,7 @@ class NodeTest {
      * Tests
      */
 
-    // @Test
+    @Test
     void startingTwoNodesSimultaneouslyYieldsACoordinator() {
 
         try {
@@ -56,7 +56,7 @@ class NodeTest {
             node1.getSearchClusterThread().start();
             node2.getSearchClusterThread().start();
 
-            chillout(30000);
+            chillout(60000);
             assertTrue(node1.getClusterNames().values().stream().anyMatch(x -> x.equals("Bert")));
             assertTrue(node2.getClusterNames().values().stream().anyMatch(x -> x.equals("Alice")));
             assertTrue(node1.getRole().contains("Coordinator") || node2.getRole().contains("Coordinator"));
@@ -79,7 +79,7 @@ class NodeTest {
 
         assertEquals(node1.getFileHash(), node2.getFileHash());
         assertEquals(node1.lookForIndexInFile(0), node2.lookForIndexInFile(0));
-    } // Passes
+    }
 
     // @Test
     void initializeRightWriteIndex() throws IOException {
@@ -262,7 +262,39 @@ class NodeTest {
         assertTrue(nodes.stream().allMatch(x -> x.getClusterNames().size() > 0));
         assertTrue(nodes.stream().allMatch(x -> x.getRole() != null));
         assertTrue(nodes.stream().anyMatch(x -> x.getRole().contains("Coordinator")));
+    } // Doesn't work
+
+    /*
+    @Test
+    void send100Messages() throws ConnectException {
+        deleteMessagesFile("Alice");
+        deleteMessagesFile("Bob");
+        deleteMessagesFile("Charlie");
+
+        Node[] nodes = new Node[3];
+        nodes[0] = createStartAndWaitForNode(getRandomPort(), "Alice");
+        chillout(1000);
+
+        nodes[1] = createStartAndWaitForNode(getRandomPort(), "Bob");
+        chillout(1000);
+
+        nodes[2] = createStartAndWaitForNode(getRandomPort(), "Charlie");
+        chillout(2000);
+
+        Random rand = new Random();
+
+        for (int i = 0; i < 100; i++) {
+            nodes[rand.nextInt(3)].messageQueue.sendMessage("Test-" + i);
+        }
+        chillout(10000);
+
+        nodes[0].messageQueue.sendMessage("End1");
+        nodes[1].messageQueue.sendMessage("End1");
+        nodes[2].messageQueue.sendMessage("End1");
+
+        assertEquals(101, nodes[0].getCurrentWriteIndex());
     }
+    */
 
 
     
@@ -305,7 +337,7 @@ class NodeTest {
         assertTrue(node3.getClusterNames().values().contains("Alice"));
         assertTrue(node3.getClusterNames().values().contains("Bob"));
         assertTrue(node2.getRole().contains("Participant"));
-        System.out.println("\n\n\nThree node cluster - setup complete");
+        // System.out.println("\n\n\nThree node cluster - setup complete");
     }
 
     private static void waitASec() {
@@ -339,10 +371,10 @@ class NodeTest {
 
             fw = new FileWriter(file.getAbsoluteFile(), false); // new file
             fw.write(line);
-            System.out.println("Written to file: " + new Timestamp(new Date().getTime()).toString());
+            // System.out.println("Written to file: " + new Timestamp(new Date().getTime()).toString());
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("Error with writing to file");
+            // System.out.println("Error with writing to file");
         } finally {
             try {
                 fw.close();
@@ -358,14 +390,14 @@ class NodeTest {
             return Files.deleteIfExists(file.toPath());
         } catch (IOException e) {
             // e.printStackTrace();
-            System.out.println("Couldn't delete file, flop");
+            // System.out.println("Couldn't delete file, flop");
             return false;
         }
     }
 
     private void chillout(int milliseconds) {
         try {
-            Thread.sleep(milliseconds);
+            sleep(milliseconds);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

@@ -56,7 +56,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     private void createCluster() {
-        System.out.println("Coordinator " + node.getPort() + " creating new cluster...");
+        // System.out.println("Coordinator " + node.getPort() + " creating new cluster...");
 
         clusterWriters = new HashMap<>();
         clusterListeners = new HashMap<>();
@@ -80,7 +80,7 @@ public class Coordinator extends Role implements Runnable {
         while (listening) {
             // Wait for incoming connects: continuously accept new TCP connections for new cluster participants
             try {
-                System.out.println("I'll be listening for new connections on port: " + node.getPort());
+                // System.out.println("I'll be listening for new connections on port: " + node.getPort());
                 Socket newSocket = newConnectionsSocket.accept(); // blocks until new connection
                 // System.out.println("New Connection: " + newSocket);
                 int port = newSocket.getPort();
@@ -114,12 +114,20 @@ public class Coordinator extends Role implements Runnable {
 
         StringBuilder message = new StringBuilder("CLUSTER " + node.getCurrentWriteIndex());
         Set<Integer> portSet = clusterNames.keySet();
-        node.setLatestClusterSize(portSet.size());
+        int currentClusterSize = portSet.size();
+        node.setLatestClusterSize(currentClusterSize);
 
+        StringBuilder currentlyOnline = new StringBuilder();
+        int counter = 0;
         for (Integer port : portSet) {
-            message.append(" " + clusterNames.get(port) + " " + port);
+            counter++;
+            String name = clusterNames.get(port);
+            message.append(" " + name + " " + port);
+            currentlyOnline.append(name);
+            if (currentClusterSize == counter) currentlyOnline.append(". ");
+            else currentlyOnline.append(", ");
         }
-
+        // System.out.println("  #INFO: There was a change in the chatroom, there are " + clusterNames.size() + " other people here: " + currentlyOnline.toString());
         return message.toString();
     }
 
@@ -151,16 +159,16 @@ public class Coordinator extends Role implements Runnable {
     public void sendMessageTo(int port, String message) {
         TcpWriter writer = clusterWriters.get(port);
         if (writer != null) writer.write(message);
-        else System.out.println(node.name + ": writer is null for sendMessageTo");
+        // else; // System.out.println(node.name + ": writer is null for sendMessageTo");
     }
 
     public void actionOnMessage(Message message, boolean duringInformationExchange) {
-        System.out.println("Coordinator action on " + message);
+        // System.out.println("Coordinator action on " + message);
 
         if (duringInformationExchange) {
             int localSenderPort = message.getSender();
             if (message.startsWith(StandardMessages.INTRODUCTION_PARTICIPANT.toString())) {
-                System.out.println(node.name + ": got an introduction from participant");
+                // System.out.println(node.name + ": got an introduction from participant");
 
                 String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_PARTICIPANT);
                 String[] contentSplit = content.split("\\$", 4); // 0 = Port, 1 = Name, 2 = ParticipantWriteIndex, 3 = line
@@ -190,42 +198,41 @@ public class Coordinator extends Role implements Runnable {
 
                 String lineWithIndex = node.lookForIndexInFile(participantWriteIndex);
                 if (lineWithIndex != null) lineWithIndex = lineWithIndex.trim();
-                else System.out.println("###############LINEWITHINDEX IS NULL############");
-                System.out.println(node.name + ": lineWithIndex:" + lineWithIndex);
-                System.out.println(node.name + ": participantLine:" + participantLine);
+                // System.out.println(node.name + ": lineWithIndex:" + lineWithIndex);
+                // System.out.println(node.name + ": participantLine:" + participantLine);
 
                 boolean matches = participantLine.equals(lineWithIndex);
                 if (participantWriteIndex == -1 && node.getCurrentWriteIndex() == -1) matches = true;
 
                 if (matches) {
-                    System.out.println(node.name + ": The participants messages seem to be good");
+                    // System.out.println(node.name + ": The participants messages seem to be good");
                     writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + StandardMessages.MESSAGE_BASE_GOOD);
                 } else {
-                    System.out.println(node.name + ": The participants messages are not good");
+                    // System.out.println(node.name + ": The participants messages are not good");
 
                     int fileSize = -1;
                     try {
                         File originalFile = new File(node.name + ".txt");
-                        System.out.println(originalFile.toPath());
+                        // System.out.println(originalFile.toPath());
                         if (originalFile.exists()) {
 
 
                             File tempFile = new File(node.name + contentSplit[1] + ".txt");
                             // tempFile.delete();
-                            System.out.println(tempFile.toPath());
+                            // System.out.println(tempFile.toPath());
 
                             Path hi = Files.copy(originalFile.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                            System.out.println(hi);
+                            // System.out.println(hi);
 
                             tempFiles.put(actualPort, tempFile);
                             fileSize = (int)tempFile.length();
                         } else fileSize = 0;
-                        System.out.println(node.name + ": My file size:" + fileSize);
+                        // System.out.println(node.name + ": My file size:" + fileSize);
 
                         writer.write(StandardMessages.INTRODUCTION_COORDINATOR + " " + StandardMessages.MESSAGE_BASE_BAD + " " + fileSize); // -1 = error, 0 = no file, else initiateSendMessage
                     } catch (IOException e) {
                         e.printStackTrace();
-                        System.out.println(node.name + ": Me dead lol, no message base at all");
+                        // System.out.println(node.name + ": Me dead lol, no message base at all");
                         listenerDied(actualPort);
                     } finally {
                         // if (tempFile != null) tempFile.delete();
@@ -234,7 +241,7 @@ public class Coordinator extends Role implements Runnable {
 
                 // welcomeNewNodeToCluster(); // Not yet, wait for confirmation
             } else if (message.startsWith(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE.toString())) {
-                System.out.println(node.name + ": got a response to the message base feedback");
+                // System.out.println(node.name + ": got a response to the message base feedback");
 
                 String content = message.withoutStandardPart(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE);
                 boolean needsFileTransmission = content.startsWith(StandardMessages.MESSAGE_BASE_READY_FOR_TRANSMISSION.toString());
@@ -251,7 +258,7 @@ public class Coordinator extends Role implements Runnable {
         } else {
             if (message.startsWith(StandardMessages.WANNA_SEND_MESSAGE.toString())) {
                 String content = message.withoutStandardPart(StandardMessages.WANNA_SEND_MESSAGE);
-                System.out.println(content + "/" + message.getSender() + "/");
+                // System.out.println(content + "/" + message.getSender() + "/");
                 String[] contentSplit = content.split("\\$", 2); // [0] = Name; [1] = Message
                 message.setName(contentSplit[0]);
                 message.setText(contentSplit[1]);
@@ -264,26 +271,26 @@ public class Coordinator extends Role implements Runnable {
     }
 
     private void killClusterNode(int port) {
-        System.out.println("killing: " + port);
+        // System.out.println("killing: " + port);
         clusterNames.remove(port);
 
-        TcpWriter writerToRemove = clusterWriters.getOrDefault(port, null);
-        if (writerToRemove != null) {
-            writerToRemove.close();
-            System.out.println("Node " + port + " yote him/herself out of the party!");
-        } // else = not found - can this even happen?
+        // System.out.println("Node " + port + " yote him/herself out of the party!");
+        clusterNames.remove(port);
 
-        TcpListener listenerToRemove = clusterListeners.getOrDefault(port, null);
-        if(listenerToRemove != null) {
-            listenerToRemove.close();
-        }
+        listenerThreads.get(port).interrupt();
+        listenerThreads.remove(port);
+
+        clusterListeners.get(port).close();
+        clusterListeners.remove(port);
+
+        clusterWriters.get(port).close();
+        clusterWriters.remove(port);
     }
 
     public void listenerDied(int port) {
-        System.out.println(node.name + ": Coordinator-Listener died with port: " + port);
+        // System.out.println(node.name + ": Coordinator-Listener died with port: " + port);
         // killClusterNode(port);
         handleDeathOf(port);
-        shareUpdatedClusterInfo();
     }
 
     @Override
@@ -297,7 +304,7 @@ public class Coordinator extends Role implements Runnable {
     }
 
     public void close() {
-        System.out.println("Closing coordinator...");
+        // System.out.println("Closing coordinator...");
         if(listening) {
             listening = false;
             try {
@@ -318,7 +325,7 @@ public class Coordinator extends Role implements Runnable {
         return status;
     }
 
-    public File getTempFileOf(int port) { System.out.println(node.name + ": Requested tempFile of: " + port); return tempFiles.get(port); }
+    public File getTempFileOf(int port) { return tempFiles.get(port); } // System.out.println(node.name + ": Requested tempFile of: " + port); return tempFiles.get(port); }
     public void removeTempFileOf(int port) { tempFiles.remove(port); }
 
 }

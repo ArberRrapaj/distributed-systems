@@ -9,7 +9,7 @@ public class NodeWriter extends Thread {
 
     public NodeWriter(Role role) {
         this.role = role;
-        System.out.println("Node Writer active for node: " + role.getPort());
+        // System.out.println("Node Writer active for node: " + role.getPort());
         inputScanner = new Scanner(System.in); // Create a Scanner object
     }
 
@@ -20,6 +20,7 @@ public class NodeWriter extends Thread {
             try {
                 while (hasNextLine()) {
                     message = inputScanner.nextLine();
+                    // System.out.println("Wanna send this: " + message);
                     role.node.messageQueue.sendMessage(message);
                     // role.sendMessage(message);
                 }
@@ -35,7 +36,7 @@ public class NodeWriter extends Thread {
             try {
                 sleep(50);
             } catch (InterruptedException e) {
-                System.out.println("NodeWriter is interrupted.. breaking from loop");
+                // System.out.println("NodeWriter is interrupted.. breaking from loop");
                 return false;
             }
         }
@@ -49,7 +50,7 @@ public class NodeWriter extends Thread {
 
     public void close() {
         running = false;
-        System.out.println(role.node.name + ": NodeWriter closed");
+        // System.out.println(role.node.name + ": NodeWriter closed");
         // inputScanner.close(); // TODO: seems to block reElection (close Responsibilities)
     }
 }

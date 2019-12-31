@@ -46,16 +46,16 @@ public abstract class Role {
 
     public int printCurrentlyConnected() {
         int connectedUsers = clusterNames.keySet().size();
-        System.out.println(node.name + ": Cluster status:");
+        // System.out.println(node.name + ": Cluster status:");
         switch (connectedUsers) {
             case 0:
-                System.out.println("  --> I have no gang");
+                // System.out.println("  --> I have no gang");
                 break;
             case 1:
-                System.out.println("  --> There is one person in my gang: " + connectedUsers);
+                // System.out.println("  --> There is one person in my gang: " + connectedUsers);
                 break;
             default:
-                System.out.println("  --> My gang consists of " + connectedUsers);
+                // System.out.println("  --> My gang consists of " + connectedUsers);
                 break;
         }
         return connectedUsers;
@@ -72,7 +72,7 @@ public abstract class Role {
             nodeWriter.close();
             nodeWriter = null;
         }
-        System.out.println(node.name + ": Role closed");
+        // System.out.println(node.name + ": Role closed");
     }
 
     public void addToCluster(Integer port, String name) {

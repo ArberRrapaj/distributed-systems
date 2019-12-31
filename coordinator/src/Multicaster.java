@@ -71,11 +71,11 @@ public class Multicaster extends Thread {
                    } else if(received.getIndex() != null) {
                        messageQueue.handleNewMessage(received);
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE.toString())) {
-                       System.out.println(node.getName() + ": Received a message request: " + received.toString());
+                       // System.out.println(node.getName() + ": Received a message request: " + received.toString());
                        // Get message with that index
                        int index = Integer.parseInt(received.withoutStandardPart(StandardMessages.REQUEST_MESSAGE));
                        String requestedMessage = node.messageQueue.getMessage(index);
-                       System.out.println(node.name + ": I would send this to you: " + requestedMessage);
+                       // System.out.println(node.name + ": I would send this to you: " + requestedMessage);
                        if (requestedMessage != null) send(requestedMessage);
                    } else if (received.startsWith(StandardMessages.REQUEST_MESSAGE_ANSWER.toString())) {
                       messageQueue.receivedRequestAnswer(received.sanitizeMessage(StandardMessages.REQUEST_MESSAGE_ANSWER));
@@ -86,7 +86,7 @@ public class Multicaster extends Thread {
            } catch(SocketTimeoutException e) {
                // nothing received, repeat
            } catch(IOException e) {
-               System.out.println(node.getName() + ": Socket closed");
+               // System.out.println(node.getName() + ": Socket closed");
                // e.printStackTrace();
                node.suicide();
            }
@@ -94,7 +94,7 @@ public class Multicaster extends Thread {
     }
 
     public void send(String message) throws IOException {
-        System.out.println(node.getPort() + " sending multicast message: " + message);
+        // System.out.println(node.getPort() + " sending multicast message: " + message);
         String mcMessage = node.getPort() + "|" + message;
         byte[] buf = mcMessage.getBytes();
 
@@ -115,7 +115,7 @@ public class Multicaster extends Thread {
             return null; // ignore messages sent by yourself
         }
         String content = receivedSplit[1];
-        System.out.println(node.getPort() + " [Multicast UDP message received] >> " + content);
+        // System.out.println(node.getPort() + " [Multicast UDP message received] >> " + content);
         if (content.startsWith(StandardMessages.NEW_MESSAGE.toString())) {
             content = content.substring(StandardMessages.NEW_MESSAGE.toString().length() + 1);
             String[] messageSplit = content.split("\\$", 4);
@@ -138,7 +138,7 @@ public class Multicaster extends Thread {
         } catch (IOException e) {
             // failed to leave. ignore.
         }
-        System.out.println(node.getName() + ": Multicaster closed");
+        // System.out.println(node.getName() + ": Multicaster closed");
     }
 }
 

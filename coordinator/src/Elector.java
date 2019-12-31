@@ -17,7 +17,7 @@ public abstract class Elector {
     private Date lastElection;
 
     public void reElection() {
-        System.out.println(getName() + " issue reElection " + getStatus());
+        // System.out.println(getName() + " issue reElection " + getStatus());
         if(!getStatus().isInElection() && !hasRecentlyElected()
                 && getStatus() != Status.DEAD) {
 
@@ -28,7 +28,7 @@ public abstract class Elector {
             this.candidateNames = new HashMap<>();
             this.electionVotes = new HashMap<>();
 
-            System.out.println(getName() + " start reElection " + getStatus());
+            // System.out.println(getName() + " start reElection " + getStatus());
 
             advertiseElection();
             resetResponsibilities();

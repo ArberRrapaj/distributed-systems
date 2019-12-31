@@ -73,6 +73,10 @@ public class Message {
         return toString().substring(standardMessage.length() + 1);
     }
 
+    public String asChatMessage() {
+        return this.timestamp.split(" ", 2)[1] + " @" + this.name + ": " + this.text;
+    }
+
     public Message sanitizeMessage(StandardMessages standardMessage) {
         String[] messageSplit = getText().substring(standardMessage.length() + 1).split("\\$", 4);
         setName(messageSplit[1]);

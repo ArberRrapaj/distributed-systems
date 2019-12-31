@@ -28,7 +28,7 @@ public class TcpWriter extends Thread {
     }
 
     public Socket connect(int port) throws ConnectException {
-        System.out.println("\nOh, seems like I - " + node.getPort() + " wanna connect to: " + port);
+        // System.out.println("\nOh, seems like I - " + node.getPort() + " wanna connect to: " + port);
         socket = new Socket();
         SocketAddress address = new InetSocketAddress(port);
         try {
@@ -37,7 +37,7 @@ public class TcpWriter extends Thread {
             close();
             throw new ConnectException("Failed to connect to: " + port + e);
         }
-        System.out.println("TCPClient connected socket: " + socket);
+        // System.out.println("TCPClient connected socket: " + socket);
         setupOutput();
         return socket;
     }
@@ -47,7 +47,7 @@ public class TcpWriter extends Thread {
         try {
             out = new PrintWriter(socket.getOutputStream());
         } catch (IOException e) {
-            System.out.println("Failed to create in/out streams");
+            // System.out.println("Failed to create in/out streams");
             System.exit(1);
         }
     }
@@ -56,7 +56,7 @@ public class TcpWriter extends Thread {
     public void write(String message) {
         out.println(message);
         out.flush();
-        System.out.println("Written: " + message);
+        // System.out.println("Written: " + message);
     }
 
     public void sendMessageFile() {
@@ -66,7 +66,7 @@ public class TcpWriter extends Thread {
         File tempFile = null;
         try {
             tempFile = ((Coordinator) role).getTempFileOf(id);
-            System.out.println(tempFile);
+            // System.out.println(tempFile);
 
             if (tempFile.exists()) {
 
@@ -80,11 +80,11 @@ public class TcpWriter extends Thread {
                 }
                 fis.close();
                 dos.flush();
-                dos.close();
+                // dos.close();
 
-            } else System.out.println(node.name + ": No file, so not sending any file");
+            } // else; // System.out.println(node.name + ": No file, so not sending any file");
 
-            System.out.println("Done.");
+            // System.out.println("Done.");
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -103,9 +103,9 @@ public class TcpWriter extends Thread {
         try {
             if (out != null) out.close();
             if (socket != null) socket.close();
-            System.out.println(node.name + ": TcpWriter closed");
+            // System.out.println(node.name + ": TcpWriter closed");
         } catch (IOException e) {
-            System.out.println("Failed to close");
+            // System.out.println("Failed to close");
             // System.exit(1);
         }
     }

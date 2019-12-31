@@ -27,49 +27,43 @@ public class TcpListener extends Thread {
 
         if(listening) {
             listening = false;
-            System.out.println("Seems like my true love, port " + socket.getPort() + " has just died. That means, me, the TcpListener of " + node.getName() + " will die now too, see you in hell.");
+            // System.out.println("Seems like my true love, port " + socket.getPort() + " has just died. That means, me, the TcpListener of " + node.getName() + " will die now too, see you in hell.");
             try {
                 if (in != null) in.close(); // TODO: blocks
                 socket.close();
             } catch (IOException e) {
                 // e.printStackTrace();
-                System.out.println("Couldn't close input-stream or socket ¯\\_(ツ)_/¯");
+                // System.out.println("Couldn't close input-stream or socket ¯\\_(ツ)_/¯");
             }
         }
-        System.out.println(node.name + ": TcpListener closed");
+        // System.out.println(node.name + ": TcpListener closed");
     }
 
-    // TODO: call handleDeathOf as coordinator when fails
     public void run() {
         // informationExchanged = true;
-        System.out.println("Me, a TcpListener will listen to (external) " + socket.getPort() + " on port (internal): " + socket.getLocalPort());
-
-        /*
-            Wait for initial node information, message to wait for depends on role
-            TODO: not really necessary to do it like this, only need the duringInformationExchange flag, this is only for debugging(prints)
-         */
+        // System.out.println("Me, a TcpListener will listen to (external) " + socket.getPort() + " on port (internal): " + socket.getLocalPort());
 
         while (listening && !informationExchanged) {
             try {
                 String nextLine = in.readLine();
 
                 if (nextLine != null) {
-                    System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
+                    // System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
                     Message message = new Message(port, nextLine);
                     role.actionOnMessage(message, true);
                 } else {
                     // listener died
-                    System.out.println(node.name + ": TcpListener died during information exchange");
+                    // System.out.println(node.name + ": TcpListener died during information exchange");
                     role.listenerDied(port);
                 }
             } catch (IOException ioe) {
-                System.out.println(node.name + ": TcpListener Exception during information exchange");
+                // System.out.println(node.name + ": TcpListener Exception during information exchange");
                 role.listenerDied(port);
             }
         }
 
         if (receivingFile) {
-            System.out.println(node.name + ": ReceivingFile is listening, filesize: " + FILE_SIZE);
+            // System.out.println(node.name + ": ReceivingFile is listening, filesize: " + FILE_SIZE);
 
             int bytesRead;
             int current = 0;
@@ -86,63 +80,42 @@ public class TcpListener extends Thread {
                 while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
                     totalRead += read;
                     remaining -= read;
-                    System.out.println("read " + totalRead + " bytes.");
+                    // System.out.println("read " + totalRead + " bytes.");
                     fos.write(buffer, 0, read);
                 }
-
                 fos.flush();
                 fos.close();
-                dis.close();
+                // dis.close();
 
-
-                /*
-                byte [] mybytearray  = new byte [FILE_SIZE];
-
-                fileInputStream = socket.getInputStream();
-                fos = new FileOutputStream(node.name + ".txt");
-                bos = new BufferedOutputStream(fos);
-
-                bytesRead = fileInputStream.read(mybytearray, 0, mybytearray.length);
-                current = bytesRead;
-
-                do {
-                    System.out.println(node.name + ": hi");
-                    bytesRead = fileInputStream.read(mybytearray, current, (mybytearray.length-current));
-                    if(bytesRead >= 0) current += bytesRead;
-                } while(bytesRead > -1);
-
-                bos.write(mybytearray, 0 , current);
-                bos.flush();
-                 */
-                System.out.println("File downloaded (" + current + " bytes read)");
                 node.initializeWriteIndex();
             } catch (IOException e) {
                 // e.printStackTrace();
-                System.out.println(node.name + ": TcpListener Exception during file base exchange");
+                // System.out.println(node.name + ": TcpListener Exception during file base exchange");
                 role.listenerDied(port);
             }
 
         }
 
-        System.out.println(node.name + ": information was exchanged, I'll listen the right way now");
+        // System.out.println(node.name + ": information was exchanged, I'll listen the right way now");
         node.messageQueue.sendQueuedMessages();
 
         while (listening) {
             try {
                 String nextLine = in.readLine();
-                System.out.println(node.name + ": nextLine from readLine() = " + nextLine);
+                // System.out.println(node.name + ": nextLine from readLine() = " + nextLine);
 
                 if (nextLine != null) {
-                    System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
+                    // System.out.println("TcpListener: " + node.getPort() + " : " + nextLine);
                     Message message = new Message(port, nextLine);
                     role.actionOnMessage(message, false);
                 } else {
                     // listener died
-                    System.out.println(node.name + ": TcpListener-RUN Exception");
+                    // System.out.println(node.name + ": TcpListener-RUN Exception#1");
                     role.listenerDied(port);
                 }
             } catch (IOException ioe) {
-                System.out.println(node.name + ": TcpListener-RUN Exception");
+                ioe.printStackTrace();
+                // System.out.println(node.name + ": TcpListener-RUN Exception#2");
                 role.listenerDied(port);
             }
         }

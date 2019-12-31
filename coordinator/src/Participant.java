@@ -25,7 +25,7 @@ public class Participant extends Role {
         clusterNames = new HashMap<>();
         // addToCluster(coordinator, coordinatorName);
 
-        System.out.println("Port " + node.getPort() + "(" + node.name + ") joining cluster of: " + coordinator + "(" + coordinatorName + ")");
+        // System.out.println("Port " + node.getPort() + "(" + node.name + ") joining cluster of: " + coordinator + "(" + coordinatorName + ")");
         establishCoordConnection(coordinator);
     }
 
@@ -36,8 +36,7 @@ public class Participant extends Role {
         coordTcpListener = new TcpListener(this, node, socket, node.getPort());
         listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
         listenerThread.start();
-        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
-    }
+        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name + "$" + node.getCurrentWriteIndex() + "$" + node.lookForIndexInFile(node.getCurrentWriteIndex()));    }
 
     public void sendMessage(String message) {
         // TODO: Implement send Message – request index + timestamp and send
@@ -56,7 +55,7 @@ public class Participant extends Role {
             if (message.startsWith(StandardMessages.INTRODUCTION_COORDINATOR.toString())) {
                 String content = message.withoutStandardPart(StandardMessages.INTRODUCTION_COORDINATOR);
                 if (content.startsWith(StandardMessages.MESSAGE_BASE_GOOD.toString())) {
-                    System.out.println(node.name + ": My message base seems to be good, we gucci");
+                    // System.out.println(node.name + ": My message base seems to be good, we gucci");
                     // we good, information is exchanged
                     coordTcpListener.informationExchanged = true;
                     coordTcpWriter.write(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE + " " + StandardMessages.MESSAGE_BASE_DONE);
@@ -65,16 +64,16 @@ public class Participant extends Role {
                     int fileSize = Integer.parseInt(content.substring(StandardMessages.MESSAGE_BASE_BAD.length() + 1));
                     if (fileSize == -1) {
                         // I don't think this will happen, since pipe will break. but suicide just to be sure
-                        System.out.println(node.name + ": Seems like the coordinator had problems");
+                        // System.out.println(node.name + ": Seems like the coordinator had problems");
                         close();
                     } else if (fileSize == 0) {
                         // Just delete file -> sync with coordinator
-                        System.out.println(node.name + ": Coordinator told me to delete my messages");
+                        // System.out.println(node.name + ": Coordinator told me to delete my messages");
                         node.deleteMessagesFile();
                         coordTcpWriter.write(StandardMessages.MESSAGE_BASE_FEEDBACK_RESPONSE + " " + StandardMessages.MESSAGE_BASE_DONE);
                     } else {
                         // prepare for file transfer
-                        System.out.println(node.name + ": Preparing for file transfer, my messages weren't good");
+                        // System.out.println(node.name + ": Preparing for file transfer, my messages weren't good");
 
                         node.deleteMessagesFile();
                         coordTcpListener.FILE_SIZE = fileSize;
@@ -105,6 +104,8 @@ public class Participant extends Role {
                 // TODO: check coordinatorsIndex ?<=>? myIndex
                 clusterNames.clear();
 
+                StringBuilder currentlyOnline = new StringBuilder();
+
                 addToCluster(coordinator, coordinatorName);
                 if (messageSplit.length > 2) {
                     for (int i = 2; i < messageSplit.length; i += 2) {
@@ -112,10 +113,13 @@ public class Participant extends Role {
                         String name = messageSplit[i];
                         if(port != node.getPort()) {
                             addToCluster(port, name);
-                            System.out.println(node.name + ": Added " + name + " to cluster");
+                            currentlyOnline.append(name).append(", ");
+                            // System.out.println(node.name + ": Added " + name + " to cluster");
                         }
                     }
                 }
+                currentlyOnline.append(coordinatorName).append(".");
+                // System.out.println("  #INFO: There was a change in the chatroom, there are " + (clusterNames.size() + 1) + " other people here: " + currentlyOnline.toString());
                 node.setLatestClusterSize(clusterNames.size());
             } else if (message.startsWith(StandardMessages.WANNA_SEND_RESPONSE.toString())) {
                 message.sanitizeMessage(StandardMessages.WANNA_SEND_RESPONSE);
@@ -135,7 +139,7 @@ public class Participant extends Role {
 
     public void listenerDied(int port) {
         close();
-        System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
+        // System.out.println("Seems like my coordTcpListener, the bastard, killed himself, so there is no need for me to be in this imperfect world anymore.");
         // initiateReElection(); TODO: Why?
     }
 
@@ -158,9 +162,9 @@ public class Participant extends Role {
 
         if (coordTcpWriter != null) {
             coordTcpWriter.close();
-            coordTcpWriter.close(); // TODO: why twice?
+            coordTcpWriter = null;
         }
-        System.out.println(node.name + ": Participant closed");
+        // System.out.println(node.name + ": Participant closed");
     }
 
     public Status getStatus() {
@@ -169,11 +173,9 @@ public class Participant extends Role {
 
     @Override
     public void handleDeathOf(Integer port) {
-        if(coordinator.equals(port)) {
+        if (port.equals(coordinator)) {
             coordinator = null;
             initiateReElection();
-        } else {
-            clusterNames.remove(port);
         }
     }
 

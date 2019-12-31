@@ -31,7 +31,7 @@ public class Node extends Elector {
     private int backoff = 0;
 
     public static void main(String[] args) {
-        System.out.println("Welcome to P2P-Chat.");
+        // System.out.println("Welcome to P2P-Chat.");
         String username;
         if(args.length > 0) {
             // Format of startup: java Node <username>
@@ -71,7 +71,7 @@ public class Node extends Elector {
 
         checkPortAvailability(port);
 
-        System.out.println("\nStarted Node with name: " + name);
+        // System.out.println("\nStarted Node with name: " + name);
         this.name = name;
         this.port = port;
         initializeWriteIndex();
@@ -172,7 +172,7 @@ public class Node extends Elector {
             backoff++;
             long upperBound = Math.round(Math.pow(2.0, backoff));
             long k = Math.round(new Random().nextFloat() * (upperBound - 1));
-            System.out.println("k: " + k);
+            // System.out.println("k: " + k);
             sleep(k * 50);
             return getSearchClusterThread();
         } catch (InterruptedException e) {
@@ -312,10 +312,11 @@ public class Node extends Elector {
             fw = new FileWriter(file.getAbsoluteFile(), true); // append the new data to end
             fw.write(line);
             // System.out.println(name + ": Written to file: " + new Timestamp(new Date().getTime()).toString());
-            System.out.println(name + ": Written to file: " + line);
+            // System.out.println(name + ": Written to file: " + line);
+            System.out.println(message.asChatMessage());
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("Error with writing to file");
+            // System.out.println("Error with writing to file");
         } finally {
             try {
                 fw.close();
@@ -394,7 +395,7 @@ public class Node extends Elector {
             return Files.deleteIfExists(file.toPath());
         } catch (IOException e) {
             // e.printStackTrace();
-            System.out.println("Couldn't delete file, flop");
+            // System.out.println("Couldn't delete file, flop");
             return false;
         }
     }
@@ -416,7 +417,7 @@ public class Node extends Elector {
             return DatatypeConverter.printHexBinary(hash);
         } catch (IOException | NoSuchAlgorithmException e) {
             // e.printStackTrace();
-            System.out.println("There is no file, thus no hash");
+            // System.out.println("There is no file, thus no hash");
             return null;
         }
     }
@@ -442,9 +443,9 @@ public class Node extends Elector {
     }
 
     public void close() {
-        System.out.println(name + ": Closing node");
+        // System.out.println(name + ": Closing node");
         multicaster.close();
         role.close();
-        System.out.println(name + ": Node closed");
+        // System.out.println(name + ": Node closed");
     }
 }

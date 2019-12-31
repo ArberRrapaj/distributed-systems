@@ -21,7 +21,7 @@ public class MessageQueue {
 
     public void sendQueuedMessages() {
         for (String message: toSend) {
-            System.out.println(node.name + ": calling sendqueuedmessages");
+            // System.out.println(node.name + ": calling sendqueuedmessages");
             node.role.sendMessage(message);
         }
     }
@@ -29,9 +29,9 @@ public class MessageQueue {
     public void handleNewMessage(Message received) {
         // System.out.println(node.getName() + ": That's a new message, Index: " + received.getIndex() + "; My WriteIndex: " + node.getCurrentWriteIndex());
 
-        System.out.println("handleNewMessage-Participant");
+        // System.out.println("handleNewMessage-Participant");
         if ( node.getNextWriteIndex() == received.getIndex() ){
-            System.out.println(node.getName() + ": It's the next message according to the write index, so let's write it down; wi:" + node.getCurrentWriteIndex() + "; mi:" + received.getIndex());
+            // System.out.println(node.getName() + ": It's the next message according to the write index, so let's write it down; wi:" + node.getCurrentWriteIndex() + "; mi:" + received.getIndex());
             node.writeToFile(received);
             node.getNewWriteIndex();
             checkForAvailableMessagesToWrite();
@@ -41,7 +41,7 @@ public class MessageQueue {
     }
 
     public void receivedHigherMessage(Message message) {
-        System.out.println(node.getName() + ": a higher message, according to write index, ask for oldies; wi:" + node.getCurrentWriteIndex() + "; mi:" + message.getIndex());
+        // System.out.println(node.getName() + ": a higher message, according to write index, ask for oldies; wi:" + node.getCurrentWriteIndex() + "; mi:" + message.getIndex());
         // System.out.println(node.getName() + ": receivedHigherMessage");
 
         toWrite.put(message.getIndex(), message);
@@ -57,7 +57,7 @@ public class MessageQueue {
     }
 
     public void requestMessage(int i) {
-        System.out.println(node.name + ": requesting message: " + i);
+        // System.out.println(node.name + ": requesting message: " + i);
 
         try {
             node.multicaster.send(StandardMessages.REQUEST_MESSAGE.toString() + " " + i);
@@ -68,7 +68,7 @@ public class MessageQueue {
     }
 
     public void requestMissingMessages(int indexFromCoordinator) {
-        System.out.println(node.name + ": looking for missing messages to request wi:" + node.getCurrentWriteIndex() + "; ci:" + indexFromCoordinator);
+        // System.out.println(node.name + ": looking for missing messages to request wi:" + node.getCurrentWriteIndex() + "; ci:" + indexFromCoordinator);
 
         int currentWriteIndex = node.getCurrentWriteIndex();
         if (indexFromCoordinator > currentWriteIndex) {
@@ -79,7 +79,7 @@ public class MessageQueue {
     }
 
     public void checkForAvailableMessagesToWrite() {
-        System.out.println(node.getName() + ": Check for available messages to write");
+        // System.out.println(node.getName() + ": Check for available messages to write");
 
         // Iterator<Integer> it = toWrite.keySet().iterator();
 
@@ -102,7 +102,7 @@ public class MessageQueue {
             Integer index = it.next();
             Message message = toWrite.get(index);
             it.remove();
-            System.out.println(node.getName() + ": I'm iterating, baby; " + index);
+            // System.out.println(node.getName() + ": I'm iterating, baby; " + index);
             node.writeToFile(message);
         }
 
