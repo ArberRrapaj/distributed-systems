@@ -36,6 +36,7 @@ public class Participant extends Role {
         coordTcpListener = new TcpListener(this, node, socket, node.getPort());
         listenerThread = new Thread(coordTcpListener, "coordTcpListener-"+node.getName());
         listenerThread.start();
+        coordTcpWriter.write(StandardMessages.INTRODUCTION_PARTICIPANT + " " + node.getPort() + "$" + node.name);
     }
 
     public void sendMessage(String message) {
